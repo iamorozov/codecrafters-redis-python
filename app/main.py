@@ -9,11 +9,11 @@ def main():
     server_socket = socket.create_server(("localhost", 6379), reuse_port=True)
     print("Redis server listening on port 6379")
 
-    client_socket, address = server_socket.accept()
-    print(f"Client connected from {address}")
-
     while True:
         try:
+            client_socket, address = server_socket.accept()
+            print(f"Client connected from {address}")
+
             data = client_socket.recv(1024)
             print(f"Received: {data}")
 
@@ -33,6 +33,8 @@ def main():
         except Exception as e:
             print(f"Error handling client: {e}")
             break
+        finally:
+            client_socket.close()
 
 
 if __name__ == "__main__":
