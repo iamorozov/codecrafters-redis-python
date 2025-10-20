@@ -1,5 +1,6 @@
 import socket  # noqa: F401
 import threading
+from app.resp_parser import parse_command
 
 
 def main():
@@ -36,13 +37,33 @@ def handle_connection(client_socket):
             client_socket.close()
             break
 
-        # Parse and handle the command
-        command_str = data.decode('utf-8').upper()
+        # Parse the RESP command
+        command = parse_command(data)
+        print(f"Parsed command: {command}")
 
-        if 'PING' in command_str:
-            response = b"+PONG\r\n"
-            client_socket.send(response)
-            print("Sent: +PONG")
+        if command:
+            # Handle different commands
+            if command[0] == 'PING':
+                response = b"+PONG\r\n"
+                client_socket.send(response)
+                print("Sent: +PONG")
+            elif command[0] == 'ECHO':
+                # ECHO command returns the argument as a bulk string
+                if len(command) < 2:
+                    error = b"-ERR wrong number of arguments for 'echo' command\r\n"
+                    client_socket.send(error)
+                    print("Sent error: ECHO requires argument")
+                else:
+                    message = command[1]
+                    # Send as bulk string: $<length>\r\n<data>\r\n
+                    response = f"${len(message)}\r\n{message}\r\n".encode('utf-8')
+                    client_socket.send(response)
+                    print(f"Sent: {message}")
+            else:
+                # Unknown command
+                error = f"-ERR unknown command '{command[0]}'\r\n"
+                client_socket.send(error.encode('utf-8'))
+                print(f"Sent error: unknown command")
 
 
 if __name__ == "__main__":
