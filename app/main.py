@@ -14,27 +14,27 @@ def main():
             client_socket, address = server_socket.accept()
             print(f"Client connected from {address}")
 
-            data = client_socket.recv(1024)
-            print(f"Received: {data}")
+            while True:
+                data = client_socket.recv(1024)
+                print(f"Received: {data}")
 
-            if not data:
-                # Client disconnected (empty data means connection closed)
-                print("Client disconnected")
-                break
+                if not data:
+                    # Client disconnected (empty data means connection closed)
+                    print("Client disconnected")
+                    client_socket.close()
+                    break
 
-            # Parse and handle the command
-            command_str = data.decode('utf-8').upper()
+                # Parse and handle the command
+                command_str = data.decode('utf-8').upper()
 
-            if 'PING' in command_str:
-                response = b"+PONG\r\n"
-                client_socket.send(response)
-                print("Sent: +PONG")
+                if 'PING' in command_str:
+                    response = b"+PONG\r\n"
+                    client_socket.send(response)
+                    print("Sent: +PONG")
 
         except Exception as e:
             print(f"Error handling client: {e}")
             break
-        finally:
-            client_socket.close()
 
 
 if __name__ == "__main__":
