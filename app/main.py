@@ -93,17 +93,18 @@ def handle_connection(client_socket):
                 else:
                     key = command[1]
 
-                    null = "$-1\r\n"
+                    null = "$-1\r\n".encode('utf-8')
                     value, expiry = store.get(key, (None, None))
                     now = round(time.time() * 1000)
 
                     if value is None:
-                        value = null
+                        response = null
                     elif expiry is not None and expiry < now:
                         del(store[key])
-                        value = null
+                        response = null
+                    else:
+                        response = f"${value}\r\n{expiry}\r\n".encode('utf-8')
 
-                    response = f"${len(value)}\r\n{value}\r\n".encode('utf-8')
                     client_socket.send(response)
                     print(f"Sent: {value}")
             else:
