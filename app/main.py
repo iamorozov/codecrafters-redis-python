@@ -2,6 +2,7 @@ import socket  # noqa: F401
 import threading
 from app.resp_parser import parse_command
 
+store = {}
 
 def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -59,6 +60,34 @@ def handle_connection(client_socket):
                     response = f"${len(message)}\r\n{message}\r\n".encode('utf-8')
                     client_socket.send(response)
                     print(f"Sent: {message}")
+            elif command[0] == 'SET':
+                if len(command) < 3:
+                    error = b"-ERR wrong number of arguments for 'set' command\r\n"
+                    client_socket.send(error)
+                    print("Sent error: SET requires 2 arguments")
+                else:
+                    key = command[1]
+                    value = command[2]
+
+                    store[key] = value
+
+                    response = b"+OK\r\n"
+
+                    client_socket.send(response)
+                    print(f"Saved value: {key}={store[key]}")
+            elif command[0] == 'GET':
+                if len(command) < 2:
+                    error = b"-ERR wrong number of arguments for 'get' command\r\n"
+                    client_socket.send(error)
+                    print("Sent error: GET requires argument")
+                else:
+                    key = command[1]
+
+                    value = store.get(key, "$-1\r\n")
+
+                    response = f"${len(value)}\r\n{value}\r\n".encode('utf-8')
+                    client_socket.send(response)
+                    print(f"Sent: {value}")
             else:
                 # Unknown command
                 error = f"-ERR unknown command '{command[0]}'\r\n"
