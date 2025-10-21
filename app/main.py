@@ -1,6 +1,7 @@
 import socket  # noqa: F401
 import threading
 from app.resp_parser import parse_command
+import time
 
 store = {}
 
@@ -64,12 +65,21 @@ def handle_connection(client_socket):
                 if len(command) < 3:
                     error = b"-ERR wrong number of arguments for 'set' command\r\n"
                     client_socket.send(error)
-                    print("Sent error: SET requires 2 arguments")
+                    print("Sent error: SET requires at least 2 arguments")
                 else:
                     key = command[1]
                     value = command[2]
 
-                    store[key] = value
+                    expiry = None
+                    now = round(time.time() * 1000)
+
+                    if len(command) == 5:
+                        if command[3].lower() == 'ex':
+                            expiry = now + int(command[4]) * 1000
+                        elif command[3].lower() == 'px':
+                            expiry = now + int(command[4])
+
+                    store[key] = (value, expiry)
 
                     response = b"+OK\r\n"
 
@@ -83,7 +93,15 @@ def handle_connection(client_socket):
                 else:
                     key = command[1]
 
-                    value = store.get(key, "$-1\r\n")
+                    null = "$-1\r\n"
+                    value, expiry = store.get(key, (None, None))
+                    now = round(time.time() * 1000)
+
+                    if value is None:
+                        value = null
+                    elif expiry is not None and expiry < now:
+                        del(store[key])
+                        value = null
 
                     response = f"${len(value)}\r\n{value}\r\n".encode('utf-8')
                     client_socket.send(response)
