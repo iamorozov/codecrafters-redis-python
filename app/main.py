@@ -103,7 +103,7 @@ def handle_connection(client_socket):
                         del(store[key])
                         response = null
                     else:
-                        response = f"${value}\r\n{expiry}\r\n".encode('utf-8')
+                        response = f"${len(value)}\r\n{value}\r\n".encode('utf-8')
 
                     client_socket.send(response)
                     print(f"Sent: {value}")
