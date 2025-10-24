@@ -1,5 +1,4 @@
-import socket  # noqa: F401
-import threading
+import asyncio
 import time
 from app.resp_parser import (
     parse_command,
@@ -12,28 +11,24 @@ from app.resp_parser import (
 
 store = {}
 
-def main():
-    # You can use print statements as follows for debugging, they'll be visible when running tests.
+
+async def main():
+    """Main entry point - starts the asyncio event loop and server"""
     print("Logs from your program will appear here!")
 
-    # Create server socket on port 6379
-    server_socket = socket.create_server(("localhost", 6379), reuse_port=True)
+    # Create asyncio server on port 6379
+    server = await asyncio.start_server(
+        handle_connection,
+        host="localhost",
+        port=6379,
+        reuse_port=True
+    )
+
     print("Redis server listening on port 6379")
 
-    threads = []
-
-    while True:
-        try:
-            client_socket, address = server_socket.accept()
-            print(f"Client connected from {address}")
-
-            t = threading.Thread(target=handle_connection, args=(client_socket,))
-            threads.append(t)
-            t.start()
-
-        except Exception as e:
-            print(f"Error handling client: {e}")
-            break
+    # Serve forever
+    async with server:
+        await server.serve_forever()
 
 def handle_ping(command: PingCommand) -> bytes:
     """Handle PING command - returns PONG"""
@@ -80,44 +75,64 @@ def handle_get(command: GetCommand) -> bytes:
     return response
 
 
-def handle_connection(client_socket):
-    """Handle a client connection - receive commands and send responses"""
-    while True:
-        data = client_socket.recv(1024)
-        print(f"Received: {data}")
+async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    """
+    Handle a client connection using asyncio streams
 
-        if not data:
-            # Client disconnected (empty data means connection closed)
-            print("Client disconnected")
-            client_socket.close()
-            break
+    Args:
+        reader: Async stream reader for receiving data
+        writer: Async stream writer for sending data
+    """
+    address = writer.get_extra_info('peername')
+    print(f"Client connected from {address}")
 
-        # Parse and validate the RESP command
-        command = parse_command(data)
-        print(f"Parsed command: {command}")
+    try:
+        while True:
+            # Asynchronously read data from client
+            data = await reader.read(1024)
+            print(f"Received: {data}")
 
-        # Handle command errors
-        if isinstance(command, CommandError):
-            error = f"-ERR {command.message}\r\n"
-            client_socket.send(error.encode('utf-8'))
-            print(f"Sent error: {command.message}")
-            continue
+            if not data:
+                # Client disconnected (empty data means connection closed)
+                print("Client disconnected")
+                break
 
-        # Dispatch to appropriate handler
-        response = None
-        if isinstance(command, PingCommand):
-            response = handle_ping(command)
-        elif isinstance(command, EchoCommand):
-            response = handle_echo(command)
-        elif isinstance(command, SetCommand):
-            response = handle_set(command)
-        elif isinstance(command, GetCommand):
-            response = handle_get(command)
+            # Parse and validate the RESP command
+            command = parse_command(data)
+            print(f"Parsed command: {command}")
 
-        # Send response to client
-        if response:
-            client_socket.send(response)
+            # Handle command errors
+            if isinstance(command, CommandError):
+                error = f"-ERR {command.message}\r\n"
+                writer.write(error.encode('utf-8'))
+                await writer.drain()
+                print(f"Sent error: {command.message}")
+                continue
+
+            # Dispatch to appropriate handler
+            response = None
+            if isinstance(command, PingCommand):
+                response = handle_ping(command)
+            elif isinstance(command, EchoCommand):
+                response = handle_echo(command)
+            elif isinstance(command, SetCommand):
+                response = handle_set(command)
+            elif isinstance(command, GetCommand):
+                response = handle_get(command)
+
+            # Send response to client
+            if response:
+                writer.write(response)
+                await writer.drain()  # Ensure data is sent
+
+    except Exception as e:
+        print(f"Error handling client: {e}")
+    finally:
+        # Clean up the connection
+        writer.close()
+        await writer.wait_closed()
+        print(f"Connection closed for {address}")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
