@@ -41,6 +41,13 @@ class GetCommand:
 
 
 @dataclass
+class RpushCommand:
+    """The RPUSH command is used to append elements to a list. If the list doesn't exist, it is created first."""
+    list_key: str
+    value: str
+
+
+@dataclass
 class CommandError:
     """Represents a command parsing/validation error"""
     message: str
@@ -218,6 +225,11 @@ def parse_command(data: bytes):
             if len(args) != 1:
                 return CommandError("wrong number of arguments for 'get' command")
             return GetCommand(key=str(args[0]))
+
+        elif cmd_name == 'RPUSH':
+            if len(args) != 2:
+                return CommandError("wrong number of arguments for 'rpush' command")
+            return RpushCommand(list_key=str(args[0]), value=str(args[1]))
 
         else:
             return CommandError(f"unknown command '{cmd_name}'")

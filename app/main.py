@@ -6,11 +6,12 @@ from app.resp_parser import (
     EchoCommand,
     SetCommand,
     GetCommand,
+    RpushCommand,
     CommandError,
     encode_simple_string,
     encode_bulk_string,
     encode_null,
-    encode_error
+    encode_error, encode_integer
 )
 
 store = {}
@@ -77,6 +78,14 @@ def handle_get(command: GetCommand) -> bytes:
     return response
 
 
+def handle_rpush(command: RpushCommand) -> bytes:
+    """Handle RPUSH command - adds value to the list"""
+
+    store[command.list_key] = store.get(command.list_key, []) + [command.value]
+    print(f"Saved: {command.list_key}={store[command.list_key]}")
+    return encode_integer(len(store[command.list_key]))
+
+
 async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     """
     Handle a client connection using asyncio streams
@@ -120,6 +129,8 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                 response = handle_set(command)
             elif isinstance(command, GetCommand):
                 response = handle_get(command)
+            elif isinstance(command, RpushCommand):
+                response = handle_rpush(command)
 
             # Send response to client
             if response:
