@@ -35,7 +35,53 @@ def main():
             print(f"Error handling client: {e}")
             break
 
+def handle_ping(command: PingCommand) -> bytes:
+    """Handle PING command - returns PONG"""
+    print("Sent: +PONG")
+    return b"+PONG\r\n"
+
+
+def handle_echo(command: EchoCommand) -> bytes:
+    """Handle ECHO command - returns the message as a bulk string"""
+    response = f"${len(command.message)}\r\n{command.message}\r\n".encode('utf-8')
+    print(f"Sent: {command.message}")
+    return response
+
+
+def handle_set(command: SetCommand) -> bytes:
+    """Handle SET command - stores key-value pair with optional expiry"""
+    now = round(time.time() * 1000)
+    expiry = None
+
+    if command.expiry_ms is not None:
+        expiry = now + command.expiry_ms
+
+    store[command.key] = (command.value, expiry)
+    print(f"Saved: {command.key}={command.value} (expiry: {expiry})")
+    return b"+OK\r\n"
+
+
+def handle_get(command: GetCommand) -> bytes:
+    """Handle GET command - retrieves value by key"""
+    null = b"$-1\r\n"
+    value, expiry = store.get(command.key, (None, None))
+    now = round(time.time() * 1000)
+
+    if value is None:
+        response = null
+    elif expiry is not None and expiry < now:
+        # Key expired, delete it
+        del store[command.key]
+        response = null
+    else:
+        response = f"${len(value)}\r\n{value}\r\n".encode('utf-8')
+
+    print(f"Sent: {value}")
+    return response
+
+
 def handle_connection(client_socket):
+    """Handle a client connection - receive commands and send responses"""
     while True:
         data = client_socket.recv(1024)
         print(f"Received: {data}")
@@ -57,49 +103,20 @@ def handle_connection(client_socket):
             print(f"Sent error: {command.message}")
             continue
 
-        # Handle PING command
+        # Dispatch to appropriate handler
+        response = None
         if isinstance(command, PingCommand):
-            response = b"+PONG\r\n"
-            client_socket.send(response)
-            print("Sent: +PONG")
-
-        # Handle ECHO command
+            response = handle_ping(command)
         elif isinstance(command, EchoCommand):
-            # Send as bulk string: $<length>\r\n<data>\r\n
-            response = f"${len(command.message)}\r\n{command.message}\r\n".encode('utf-8')
-            client_socket.send(response)
-            print(f"Sent: {command.message}")
-
-        # Handle SET command
+            response = handle_echo(command)
         elif isinstance(command, SetCommand):
-            now = round(time.time() * 1000)
-            expiry = None
-
-            if command.expiry_ms is not None:
-                expiry = now + command.expiry_ms
-
-            store[command.key] = (command.value, expiry)
-            response = b"+OK\r\n"
-            client_socket.send(response)
-            print(f"Saved: {command.key}={command.value} (expiry: {expiry})")
-
-        # Handle GET command
+            response = handle_set(command)
         elif isinstance(command, GetCommand):
-            null = b"$-1\r\n"
-            value, expiry = store.get(command.key, (None, None))
-            now = round(time.time() * 1000)
+            response = handle_get(command)
 
-            if value is None:
-                response = null
-            elif expiry is not None and expiry < now:
-                # Key expired, delete it
-                del store[command.key]
-                response = null
-            else:
-                response = f"${len(value)}\r\n{value}\r\n".encode('utf-8')
-
+        # Send response to client
+        if response:
             client_socket.send(response)
-            print(f"Sent: {value}")
 
 
 if __name__ == "__main__":
