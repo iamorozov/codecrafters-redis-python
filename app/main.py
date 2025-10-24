@@ -81,7 +81,7 @@ def handle_get(command: GetCommand) -> bytes:
 def handle_rpush(command: RpushCommand) -> bytes:
     """Handle RPUSH command - adds value to the list"""
 
-    store[command.list_key] = store.get(command.list_key, []) + [command.value]
+    store[command.list_key] = store.get(command.list_key, []) + command.values
     print(f"Saved: {command.list_key}={store[command.list_key]}")
     return encode_integer(len(store[command.list_key]))
 

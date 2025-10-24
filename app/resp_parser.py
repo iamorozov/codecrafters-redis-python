@@ -44,7 +44,7 @@ class GetCommand:
 class RpushCommand:
     """The RPUSH command is used to append elements to a list. If the list doesn't exist, it is created first."""
     list_key: str
-    value: str
+    values: list[str]
 
 
 @dataclass
@@ -227,9 +227,9 @@ def parse_command(data: bytes):
             return GetCommand(key=str(args[0]))
 
         elif cmd_name == 'RPUSH':
-            if len(args) != 2:
+            if len(args) < 2:
                 return CommandError("wrong number of arguments for 'rpush' command")
-            return RpushCommand(list_key=str(args[0]), value=str(args[1]))
+            return RpushCommand(list_key=str(args[0]), values=args[1:])
 
         else:
             return CommandError(f"unknown command '{cmd_name}'")
