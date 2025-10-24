@@ -6,7 +6,11 @@ from app.resp_parser import (
     EchoCommand,
     SetCommand,
     GetCommand,
-    CommandError
+    CommandError,
+    encode_simple_string,
+    encode_bulk_string,
+    encode_null,
+    encode_error
 )
 
 store = {}
@@ -33,14 +37,13 @@ async def main():
 def handle_ping(command: PingCommand) -> bytes:
     """Handle PING command - returns PONG"""
     print("Sent: +PONG")
-    return b"+PONG\r\n"
+    return encode_simple_string("PONG")
 
 
 def handle_echo(command: EchoCommand) -> bytes:
     """Handle ECHO command - returns the message as a bulk string"""
-    response = f"${len(command.message)}\r\n{command.message}\r\n".encode('utf-8')
     print(f"Sent: {command.message}")
-    return response
+    return encode_bulk_string(command.message)
 
 
 def handle_set(command: SetCommand) -> bytes:
@@ -53,23 +56,22 @@ def handle_set(command: SetCommand) -> bytes:
 
     store[command.key] = (command.value, expiry)
     print(f"Saved: {command.key}={command.value} (expiry: {expiry})")
-    return b"+OK\r\n"
+    return encode_simple_string("OK")
 
 
 def handle_get(command: GetCommand) -> bytes:
     """Handle GET command - retrieves value by key"""
-    null = b"$-1\r\n"
     value, expiry = store.get(command.key, (None, None))
     now = round(time.time() * 1000)
 
     if value is None:
-        response = null
+        response = encode_null()
     elif expiry is not None and expiry < now:
         # Key expired, delete it
         del store[command.key]
-        response = null
+        response = encode_null()
     else:
-        response = f"${len(value)}\r\n{value}\r\n".encode('utf-8')
+        response = encode_bulk_string(value)
 
     print(f"Sent: {value}")
     return response
@@ -103,8 +105,7 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
 
             # Handle command errors
             if isinstance(command, CommandError):
-                error = f"-ERR {command.message}\r\n"
-                writer.write(error.encode('utf-8'))
+                writer.write(encode_error(command.message))
                 await writer.drain()
                 print(f"Sent error: {command.message}")
                 continue
