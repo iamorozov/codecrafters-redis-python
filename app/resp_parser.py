@@ -9,6 +9,42 @@ RESP types:
 - Arrays: *2\r\n$4\r\nPING\r\n (count followed by elements)
 """
 
+from dataclasses import dataclass
+from typing import Optional
+
+
+# Command data classes
+@dataclass
+class PingCommand:
+    """PING command - returns PONG"""
+    pass
+
+
+@dataclass
+class EchoCommand:
+    """ECHO command - returns the message"""
+    message: str
+
+
+@dataclass
+class SetCommand:
+    """SET command - stores a key-value pair with optional expiry"""
+    key: str
+    value: str
+    expiry_ms: Optional[int] = None  # Expiry in milliseconds from now
+
+
+@dataclass
+class GetCommand:
+    """GET command - retrieves a value by key"""
+    key: str
+
+
+@dataclass
+class CommandError:
+    """Represents a command parsing/validation error"""
+    message: str
+
 
 class RESPParser:
     def __init__(self, data: bytes):
@@ -108,30 +144,84 @@ def parse_resp(data: bytes):
     return parser.parse()
 
 
-def parse_command(data: bytes) -> list[str] | None:
+def parse_command(data: bytes):
     """
-    Parse a Redis command from RESP format
+    Parse and validate a Redis command from RESP format
 
-    Returns a list of strings representing the command and its arguments,
-    or None if parsing fails.
+    Returns a command object (PingCommand, EchoCommand, SetCommand, GetCommand)
+    or CommandError if validation fails.
 
     Example:
         >>> parse_command(b'*1\r\n$4\r\nPING\r\n')
-        ['PING']
+        PingCommand()
+
+        >>> parse_command(b'*2\r\n$4\r\nECHO\r\n$5\r\nhello\r\n')
+        EchoCommand(message='hello')
 
         >>> parse_command(b'*3\r\n$3\r\nSET\r\n$3\r\nkey\r\n$5\r\nvalue\r\n')
-        ['SET', 'key', 'value']
+        SetCommand(key='key', value='value', expiry_ms=None)
     """
     try:
         result = parse_resp(data)
 
-        # Commands are typically arrays of bulk strings
-        if isinstance(result, list):
-            # Convert to uppercase for command matching
-            return [str(item).upper() if i == 0 else str(item)
-                    for i, item in enumerate(result)]
+        # Commands are arrays of bulk strings
+        if not isinstance(result, list) or len(result) == 0:
+            return CommandError("Invalid command format")
 
-        return None
+        # Extract command name and arguments
+        cmd_name = str(result[0]).upper()
+        args = result[1:]
+
+        # Validate and construct command objects
+        if cmd_name == 'PING':
+            if len(args) > 0:
+                return CommandError("wrong number of arguments for 'ping' command")
+            return PingCommand()
+
+        elif cmd_name == 'ECHO':
+            if len(args) != 1:
+                return CommandError("wrong number of arguments for 'echo' command")
+            return EchoCommand(message=str(args[0]))
+
+        elif cmd_name == 'SET':
+            if len(args) < 2:
+                return CommandError("wrong number of arguments for 'set' command")
+
+            key = str(args[0])
+            value = str(args[1])
+            expiry_ms = None
+
+            # Parse optional expiry arguments
+            if len(args) >= 4:
+                expiry_type = str(args[2]).upper()
+                try:
+                    expiry_value = int(args[3])
+
+                    if expiry_type == 'EX':
+                        # EX: seconds
+                        expiry_ms = expiry_value * 1000
+                    elif expiry_type == 'PX':
+                        # PX: milliseconds
+                        expiry_ms = expiry_value
+                    else:
+                        return CommandError(f"invalid expiry option: {expiry_type}")
+
+                except (ValueError, IndexError):
+                    return CommandError("invalid expiry value")
+
+            elif len(args) == 3:
+                return CommandError("syntax error")
+
+            return SetCommand(key=key, value=value, expiry_ms=expiry_ms)
+
+        elif cmd_name == 'GET':
+            if len(args) != 1:
+                return CommandError("wrong number of arguments for 'get' command")
+            return GetCommand(key=str(args[0]))
+
+        else:
+            return CommandError(f"unknown command '{cmd_name}'")
+
     except Exception as e:
         print(f"Error parsing RESP: {e}")
-        return None
+        return CommandError(f"parsing error: {str(e)}")

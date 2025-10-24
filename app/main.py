@@ -1,7 +1,14 @@
 import socket  # noqa: F401
 import threading
-from app.resp_parser import parse_command
 import time
+from app.resp_parser import (
+    parse_command,
+    PingCommand,
+    EchoCommand,
+    SetCommand,
+    GetCommand,
+    CommandError
+)
 
 store = {}
 
@@ -39,79 +46,60 @@ def handle_connection(client_socket):
             client_socket.close()
             break
 
-        # Parse the RESP command
+        # Parse and validate the RESP command
         command = parse_command(data)
         print(f"Parsed command: {command}")
 
-        if command:
-            # Handle different commands
-            if command[0] == 'PING':
-                response = b"+PONG\r\n"
-                client_socket.send(response)
-                print("Sent: +PONG")
-            elif command[0] == 'ECHO':
-                # ECHO command returns the argument as a bulk string
-                if len(command) < 2:
-                    error = b"-ERR wrong number of arguments for 'echo' command\r\n"
-                    client_socket.send(error)
-                    print("Sent error: ECHO requires argument")
-                else:
-                    message = command[1]
-                    # Send as bulk string: $<length>\r\n<data>\r\n
-                    response = f"${len(message)}\r\n{message}\r\n".encode('utf-8')
-                    client_socket.send(response)
-                    print(f"Sent: {message}")
-            elif command[0] == 'SET':
-                if len(command) < 3:
-                    error = b"-ERR wrong number of arguments for 'set' command\r\n"
-                    client_socket.send(error)
-                    print("Sent error: SET requires at least 2 arguments")
-                else:
-                    key = command[1]
-                    value = command[2]
+        # Handle command errors
+        if isinstance(command, CommandError):
+            error = f"-ERR {command.message}\r\n"
+            client_socket.send(error.encode('utf-8'))
+            print(f"Sent error: {command.message}")
+            continue
 
-                    expiry = None
-                    now = round(time.time() * 1000)
+        # Handle PING command
+        if isinstance(command, PingCommand):
+            response = b"+PONG\r\n"
+            client_socket.send(response)
+            print("Sent: +PONG")
 
-                    if len(command) == 5:
-                        if command[3].lower() == 'ex':
-                            expiry = now + int(command[4]) * 1000
-                        elif command[3].lower() == 'px':
-                            expiry = now + int(command[4])
+        # Handle ECHO command
+        elif isinstance(command, EchoCommand):
+            # Send as bulk string: $<length>\r\n<data>\r\n
+            response = f"${len(command.message)}\r\n{command.message}\r\n".encode('utf-8')
+            client_socket.send(response)
+            print(f"Sent: {command.message}")
 
-                    store[key] = (value, expiry)
+        # Handle SET command
+        elif isinstance(command, SetCommand):
+            now = round(time.time() * 1000)
+            expiry = None
 
-                    response = b"+OK\r\n"
+            if command.expiry_ms is not None:
+                expiry = now + command.expiry_ms
 
-                    client_socket.send(response)
-                    print(f"Saved value: {key}={store[key]}")
-            elif command[0] == 'GET':
-                if len(command) < 2:
-                    error = b"-ERR wrong number of arguments for 'get' command\r\n"
-                    client_socket.send(error)
-                    print("Sent error: GET requires argument")
-                else:
-                    key = command[1]
+            store[command.key] = (command.value, expiry)
+            response = b"+OK\r\n"
+            client_socket.send(response)
+            print(f"Saved: {command.key}={command.value} (expiry: {expiry})")
 
-                    null = "$-1\r\n".encode('utf-8')
-                    value, expiry = store.get(key, (None, None))
-                    now = round(time.time() * 1000)
+        # Handle GET command
+        elif isinstance(command, GetCommand):
+            null = b"$-1\r\n"
+            value, expiry = store.get(command.key, (None, None))
+            now = round(time.time() * 1000)
 
-                    if value is None:
-                        response = null
-                    elif expiry is not None and expiry < now:
-                        del(store[key])
-                        response = null
-                    else:
-                        response = f"${len(value)}\r\n{value}\r\n".encode('utf-8')
-
-                    client_socket.send(response)
-                    print(f"Sent: {value}")
+            if value is None:
+                response = null
+            elif expiry is not None and expiry < now:
+                # Key expired, delete it
+                del store[command.key]
+                response = null
             else:
-                # Unknown command
-                error = f"-ERR unknown command '{command[0]}'\r\n"
-                client_socket.send(error.encode('utf-8'))
-                print(f"Sent error: unknown command")
+                response = f"${len(value)}\r\n{value}\r\n".encode('utf-8')
+
+            client_socket.send(response)
+            print(f"Sent: {value}")
 
 
 if __name__ == "__main__":
