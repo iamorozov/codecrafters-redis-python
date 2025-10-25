@@ -48,6 +48,14 @@ class RpushCommand:
 
 
 @dataclass
+class LrangeCommand:
+    """The LRANGE command is used to retrieve elements from a list using a start index and a stop index."""
+    list_key: str
+    start: int
+    stop: int
+
+
+@dataclass
 class CommandError:
     """Represents a command parsing/validation error"""
     message: str
@@ -230,6 +238,11 @@ def parse_command(data: bytes):
             if len(args) < 2:
                 return CommandError("wrong number of arguments for 'rpush' command")
             return RpushCommand(list_key=str(args[0]), values=args[1:])
+
+        elif cmd_name == 'LRANGE':
+            if len(args) < 2:
+                return CommandError("wrong number of arguments for 'lrange' command")
+            return LrangeCommand(list_key=str(args[0]), start=int(args[1]), stop=int(args[2]))
 
         else:
             return CommandError(f"unknown command '{cmd_name}'")

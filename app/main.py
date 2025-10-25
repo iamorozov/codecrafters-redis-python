@@ -7,11 +7,12 @@ from app.resp_parser import (
     SetCommand,
     GetCommand,
     RpushCommand,
+    LrangeCommand,
     CommandError,
     encode_simple_string,
     encode_bulk_string,
     encode_null,
-    encode_error, encode_integer
+    encode_error, encode_integer, encode_array
 )
 
 store = {}
@@ -86,6 +87,14 @@ def handle_rpush(command: RpushCommand) -> bytes:
     return encode_integer(len(store[command.list_key]))
 
 
+def handle_lrange(command: LrangeCommand) -> bytes:
+    """Handle LRANGE command - retrieves values from a list"""
+
+    result = store.get(command.list_key, [])[command.start : command.stop + 1]
+    print(f"Retrieved: {command.list_key}={result}")
+    return encode_array([encode_bulk_string(x) for x in result])
+
+
 async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     """
     Handle a client connection using asyncio streams
@@ -131,6 +140,13 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                 response = handle_get(command)
             elif isinstance(command, RpushCommand):
                 response = handle_rpush(command)
+            elif isinstance(command, LrangeCommand):
+                response = handle_lrange(command)
+            else:
+                writer.write(encode_error("Unknown command"))
+                await writer.drain()
+                print(f"Got unknown command: {command}")
+                continue
 
             # Send response to client
             if response:
