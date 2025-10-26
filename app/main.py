@@ -122,7 +122,7 @@ def handle_llen(command: LlenCommand) -> bytes:
 
 
 def handle_lpop(command: LpopCommand) -> bytes:
-    """Handle LPOP command - removes and returns the first element of a list"""
+    """Handle LPOP command - removes and returns the first element(s) of a list"""
     stored_list = store.get(command.list_key, [])
 
     if not stored_list:
@@ -130,17 +130,23 @@ def handle_lpop(command: LpopCommand) -> bytes:
         print(f"LPOP {command.list_key}: list is empty or doesn't exist")
         return encode_null()
 
-    # Pop the first element
-    first_element = stored_list.pop(0)
+    # Determine how many elements to pop
+    count = command.count if command.count is not None else 1
+
+    # Pop multiple elements and return as array
+    elements_to_pop = min(count, len(stored_list))
+    popped_elements = stored_list[:elements_to_pop]
+    remaining_list = stored_list[elements_to_pop:]
 
     # Update the store (remove key if list is now empty)
-    if stored_list:
-        store[command.list_key] = stored_list
+    if remaining_list:
+        store[command.list_key] = remaining_list
     else:
         del store[command.list_key]
 
-    print(f"Popped from {command.list_key}: {first_element}")
-    return encode_bulk_string(first_element)
+    print(f"Popped {elements_to_pop} from {command.list_key}: {popped_elements}")
+    return encode_array([encode_bulk_string(x) for x in popped_elements]) if len(popped_elements) > 1 \
+        else encode_bulk_string(popped_elements[0])
 
 
 async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
