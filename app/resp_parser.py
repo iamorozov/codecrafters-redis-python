@@ -63,6 +63,12 @@ class LrangeCommand:
 
 
 @dataclass
+class LlenCommand:
+    """The LLEN command is used to get the length of a list."""
+    list_key: str
+
+
+@dataclass
 class CommandError:
     """Represents a command parsing/validation error"""
     message: str
@@ -255,6 +261,11 @@ def parse_command(data: bytes):
             if len(args) < 2:
                 return CommandError("wrong number of arguments for 'lrange' command")
             return LrangeCommand(list_key=str(args[0]), start=int(args[1]), stop=int(args[2]))
+
+        elif cmd_name == 'LLEN':
+            if len(args) != 1:
+                return CommandError("wrong number of arguments for 'llen' command")
+            return LlenCommand(list_key=str(args[0]))
 
         else:
             return CommandError(f"unknown command '{cmd_name}'")

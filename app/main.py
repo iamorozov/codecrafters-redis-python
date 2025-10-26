@@ -9,6 +9,7 @@ from app.resp_parser import (
     RpushCommand,
     LpushCommand,
     LrangeCommand,
+    LlenCommand,
     CommandError,
     encode_simple_string,
     encode_bulk_string,
@@ -111,6 +112,14 @@ def handle_lrange(command: LrangeCommand) -> bytes:
     return encode_array([encode_bulk_string(x) for x in result])
 
 
+def handle_llen(command: LlenCommand) -> bytes:
+    """Handle LLEN command - returns the length of a list"""
+    stored_list = store.get(command.list_key, [])
+    length = len(stored_list)
+    print(f"Length of {command.list_key}: {length}")
+    return encode_integer(length)
+
+
 async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     """
     Handle a client connection using asyncio streams
@@ -160,6 +169,8 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                 response = handle_lpush(command)
             elif isinstance(command, LrangeCommand):
                 response = handle_lrange(command)
+            elif isinstance(command, LlenCommand):
+                response = handle_llen(command)
             else:
                 writer.write(encode_error("Unknown command"))
                 await writer.drain()
