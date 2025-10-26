@@ -69,6 +69,12 @@ class LlenCommand:
 
 
 @dataclass
+class LpopCommand:
+    """The LPOP command is used to remove and return the first element of a list."""
+    list_key: str
+
+
+@dataclass
 class CommandError:
     """Represents a command parsing/validation error"""
     message: str
@@ -266,6 +272,11 @@ def parse_command(data: bytes):
             if len(args) != 1:
                 return CommandError("wrong number of arguments for 'llen' command")
             return LlenCommand(list_key=str(args[0]))
+
+        elif cmd_name == 'LPOP':
+            if len(args) != 1:
+                return CommandError("wrong number of arguments for 'lpop' command")
+            return LpopCommand(list_key=str(args[0]))
 
         else:
             return CommandError(f"unknown command '{cmd_name}'")

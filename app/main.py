@@ -10,6 +10,7 @@ from app.resp_parser import (
     LpushCommand,
     LrangeCommand,
     LlenCommand,
+    LpopCommand,
     CommandError,
     encode_simple_string,
     encode_bulk_string,
@@ -120,6 +121,28 @@ def handle_llen(command: LlenCommand) -> bytes:
     return encode_integer(length)
 
 
+def handle_lpop(command: LpopCommand) -> bytes:
+    """Handle LPOP command - removes and returns the first element of a list"""
+    stored_list = store.get(command.list_key, [])
+
+    if not stored_list:
+        # List doesn't exist or is empty
+        print(f"LPOP {command.list_key}: list is empty or doesn't exist")
+        return encode_null()
+
+    # Pop the first element
+    first_element = stored_list.pop(0)
+
+    # Update the store (remove key if list is now empty)
+    if stored_list:
+        store[command.list_key] = stored_list
+    else:
+        del store[command.list_key]
+
+    print(f"Popped from {command.list_key}: {first_element}")
+    return encode_bulk_string(first_element)
+
+
 async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     """
     Handle a client connection using asyncio streams
@@ -171,6 +194,8 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                 response = handle_lrange(command)
             elif isinstance(command, LlenCommand):
                 response = handle_llen(command)
+            elif isinstance(command, LpopCommand):
+                response = handle_lpop(command)
             else:
                 writer.write(encode_error("Unknown command"))
                 await writer.drain()
