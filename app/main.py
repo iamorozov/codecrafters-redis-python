@@ -89,8 +89,11 @@ def handle_rpush(command: RpushCommand) -> bytes:
 
 def handle_lrange(command: LrangeCommand) -> bytes:
     """Handle LRANGE command - retrieves values from a list"""
+    stored_list = store.get(command.list_key, [])
+    start = command.start if command.start >= 0 else max(0, len(stored_list) + command.start)
+    stop = command.stop + 1 if command.stop >= 0 else max(0, len(stored_list) + command.stop + 1)
 
-    result = store.get(command.list_key, [])[command.start : command.stop + 1]
+    result = stored_list[start : stop]
     print(f"Retrieved: {command.list_key}={result}")
     return encode_array([encode_bulk_string(x) for x in result])
 
