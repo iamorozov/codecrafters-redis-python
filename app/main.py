@@ -7,12 +7,15 @@ from app.resp_parser import (
     SetCommand,
     GetCommand,
     RpushCommand,
+    LpushCommand,
     LrangeCommand,
     CommandError,
     encode_simple_string,
     encode_bulk_string,
     encode_null,
-    encode_error, encode_integer, encode_array
+    encode_error,
+    encode_integer,
+    encode_array
 )
 
 store = {}
@@ -80,9 +83,19 @@ def handle_get(command: GetCommand) -> bytes:
 
 
 def handle_rpush(command: RpushCommand) -> bytes:
-    """Handle RPUSH command - adds value to the list"""
-
+    """Handle RPUSH command - appends values to the end of the list"""
     store[command.list_key] = store.get(command.list_key, []) + command.values
+    print(f"Saved: {command.list_key}={store[command.list_key]}")
+    return encode_integer(len(store[command.list_key]))
+
+
+def handle_lpush(command: LpushCommand) -> bytes:
+    """Handle LPUSH command - prepends values to the beginning of the list in reverse order"""
+    # LPUSH inserts values in reverse order at the beginning
+    # Example: LPUSH mylist "a" "b" "c" → ["c", "b", "a", ...existing items]
+    existing_list = store.get(command.list_key, [])
+    reversed_values = list(reversed(command.values))
+    store[command.list_key] = reversed_values + existing_list
     print(f"Saved: {command.list_key}={store[command.list_key]}")
     return encode_integer(len(store[command.list_key]))
 
@@ -143,6 +156,8 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                 response = handle_get(command)
             elif isinstance(command, RpushCommand):
                 response = handle_rpush(command)
+            elif isinstance(command, LpushCommand):
+                response = handle_lpush(command)
             elif isinstance(command, LrangeCommand):
                 response = handle_lrange(command)
             else:

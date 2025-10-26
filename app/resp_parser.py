@@ -48,6 +48,13 @@ class RpushCommand:
 
 
 @dataclass
+class LpushCommand:
+    """The LPUSH command is used to prepend elements to a list in reverse order. If the list doesn't exist, it is created first."""
+    list_key: str
+    values: list[str]
+
+
+@dataclass
 class LrangeCommand:
     """The LRANGE command is used to retrieve elements from a list using a start index and a stop index."""
     list_key: str
@@ -238,6 +245,11 @@ def parse_command(data: bytes):
             if len(args) < 2:
                 return CommandError("wrong number of arguments for 'rpush' command")
             return RpushCommand(list_key=str(args[0]), values=args[1:])
+
+        elif cmd_name == 'LPUSH':
+            if len(args) < 2:
+                return CommandError("wrong number of arguments for 'lpush' command")
+            return LpushCommand(list_key=str(args[0]), values=args[1:])
 
         elif cmd_name == 'LRANGE':
             if len(args) < 2:
