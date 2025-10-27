@@ -76,6 +76,13 @@ class LpopCommand:
 
 
 @dataclass
+class BlpopCommand:
+    """BLPOP is a blocking variant of the LPOP command. It waits for an element to become available on a list before popping it."""
+    list_key: str
+    timeout: int
+
+
+@dataclass
 class CommandError:
     """Represents a command parsing/validation error"""
     message: str
@@ -290,6 +297,11 @@ def parse_command(data: bytes):
                     return CommandError("count must be an integer")
 
             return LpopCommand(list_key=list_key, count=count)
+
+        elif cmd_name == 'BLPOP':
+            if len(args) < 1 or len(args) > 2:
+                return CommandError("wrong number of arguments for 'blpop' command")
+            return BlpopCommand(list_key=str(args[0]), timeout=int(args[1]))
 
         else:
             return CommandError(f"unknown command '{cmd_name}'")

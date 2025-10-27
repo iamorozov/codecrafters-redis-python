@@ -11,6 +11,7 @@ from app.resp_parser import (
     LrangeCommand,
     LlenCommand,
     LpopCommand,
+    BlpopCommand,
     CommandError,
     encode_simple_string,
     encode_bulk_string,
@@ -21,6 +22,7 @@ from app.resp_parser import (
 )
 
 store = {}
+queues = {}
 
 
 async def main():
@@ -88,6 +90,9 @@ def handle_rpush(command: RpushCommand) -> bytes:
     """Handle RPUSH command - appends values to the end of the list"""
     store[command.list_key] = store.get(command.list_key, []) + command.values
     print(f"Saved: {command.list_key}={store[command.list_key]}")
+
+    push_values_into_queue(command.list_key, command.values)
+
     return encode_integer(len(store[command.list_key]))
 
 
@@ -98,8 +103,18 @@ def handle_lpush(command: LpushCommand) -> bytes:
     existing_list = store.get(command.list_key, [])
     reversed_values = list(reversed(command.values))
     store[command.list_key] = reversed_values + existing_list
+
+    push_values_into_queue(command.list_key, reversed_values)
+
     print(f"Saved: {command.list_key}={store[command.list_key]}")
     return encode_integer(len(store[command.list_key]))
+
+
+def push_values_into_queue(key: str, values: list) -> None:
+    queue = queues.get(key)
+    if queue:
+        for value in values:
+            queue.put_nowait(value)
 
 
 def handle_lrange(command: LrangeCommand) -> bytes:
@@ -147,6 +162,21 @@ def handle_lpop(command: LpopCommand) -> bytes:
     print(f"Popped {elements_to_pop} from {command.list_key}: {popped_elements}")
     return encode_array([encode_bulk_string(x) for x in popped_elements]) if len(popped_elements) > 1 \
         else encode_bulk_string(popped_elements[0])
+
+
+async def handle_blpop(command: BlpopCommand) -> bytes:
+    """Handle BLPOP command - removes and returns the first element(s) of a list (Blocking)"""
+
+    stored_list = store.get(command.list_key, [])
+
+    if not stored_list:
+        queue = queues.get(command.list_key, asyncio.Queue())
+        queues[command.list_key] = queue
+        item = await queue.get()
+        queue.task_done()
+        return encode_array([encode_bulk_string(command.list_key), encode_bulk_string(item)])
+    else:
+        return encode_array([encode_bulk_string(command.list_key), handle_lpop(LpopCommand(list_key=command.list_key))])
 
 
 async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
@@ -202,6 +232,8 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                 response = handle_llen(command)
             elif isinstance(command, LpopCommand):
                 response = handle_lpop(command)
+            elif isinstance(command, BlpopCommand):
+                response = await handle_blpop(command)
             else:
                 writer.write(encode_error("Unknown command"))
                 await writer.drain()
