@@ -172,9 +172,14 @@ async def handle_blpop(command: BlpopCommand) -> bytes:
     if not stored_list:
         queue = queues.get(command.list_key, asyncio.Queue())
         queues[command.list_key] = queue
-        item = await queue.get()
-        queue.task_done()
-        return encode_array([encode_bulk_string(command.list_key), encode_bulk_string(item)])
+
+        try:
+            timeout = command.timeout if command.timeout > 0 else None
+            item = await asyncio.wait_for(queue.get(), timeout=timeout)
+            queue.task_done()
+            return encode_array([encode_bulk_string(command.list_key), encode_bulk_string(item)])
+        except asyncio.TimeoutError:
+            return encode_array(None)
     else:
         return encode_array([encode_bulk_string(command.list_key), handle_lpop(LpopCommand(list_key=command.list_key))])
 
