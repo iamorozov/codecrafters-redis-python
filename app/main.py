@@ -204,11 +204,11 @@ def handle_xadd(command: XaddCommand) -> bytes:
 
         # Check ordering: milliseconds must be >= last_ms
         if command.entry_id_ms < last_ms:
-            return encode_error("ERR The ID specified in XADD is equal or smaller than the target stream top item")
+            return encode_error("The ID specified in XADD is equal or smaller than the target stream top item")
 
         # If milliseconds are equal, sequence must be strictly greater
         if command.entry_id_ms == last_ms and command.entry_id_seq <= last_seq:
-            return encode_error("ERR The ID specified in XADD is equal or smaller than the target stream top item")
+            return encode_error("The ID specified in XADD is equal or smaller than the target stream top item")
 
     # Create entry as tuple: (ms, seq, fields_dict)
     entry = (command.entry_id_ms, command.entry_id_seq, command.fields)
