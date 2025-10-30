@@ -177,8 +177,8 @@ def handle_type(command: TypeCommand) -> bytes:
 
     # Determine the type based on the value structure
     if isinstance(value, list):
-        # Check if it's a stream (list of tuples with (entry_id, fields))
-        if value and isinstance(value[0], tuple) and len(value[0]) == 2 and isinstance(value[0][1], dict):
+        # Check if it's a stream (list of tuples with (ms, seq, fields))
+        if value and isinstance(value[0], tuple) and len(value[0]) == 3 and isinstance(value[0][2], dict):
             type_name = "stream"
         else:
             type_name = "list"
@@ -198,17 +198,30 @@ def handle_xadd(command: XaddCommand) -> bytes:
     # Get or create the stream
     stream = store.get(command.stream_key, [])
 
-    # Create entry as tuple: (entry_id, fields_dict)
-    entry = (command.entry_id, command.fields)
+    # Validate against last entry ID if stream is not empty
+    if stream:
+        last_ms, last_seq, _ = stream[-1]
+
+        # Check ordering: milliseconds must be >= last_ms
+        if command.entry_id_ms < last_ms:
+            return encode_error("ERR The ID specified in XADD is equal or smaller than the target stream top item")
+
+        # If milliseconds are equal, sequence must be strictly greater
+        if command.entry_id_ms == last_ms and command.entry_id_seq <= last_seq:
+            return encode_error("ERR The ID specified in XADD is equal or smaller than the target stream top item")
+
+    # Create entry as tuple: (ms, seq, fields_dict)
+    entry = (command.entry_id_ms, command.entry_id_seq, command.fields)
 
     # Append entry to stream
     stream.append(entry)
     store[command.stream_key] = stream
 
-    print(f"Added to stream {command.stream_key}: ID={command.entry_id}, fields={command.fields}")
+    entry_id_str = f"{command.entry_id_ms}-{command.entry_id_seq}"
+    print(f"Added to stream {command.stream_key}: ID={entry_id_str}, fields={command.fields}")
 
     # Return the entry ID as a bulk string
-    return encode_bulk_string(command.entry_id)
+    return encode_bulk_string(entry_id_str)
 
 
 async def handle_blpop(command: BlpopCommand) -> bytes:

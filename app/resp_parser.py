@@ -92,7 +92,8 @@ class TypeCommand:
 class XaddCommand:
     """The XADD command appends a new entry to a stream."""
     stream_key: str
-    entry_id: str
+    entry_id_ms: int  # Milliseconds part of entry ID
+    entry_id_seq: int  # Sequence number part of entry ID
     fields: dict[str, str]  # Key-value pairs for the entry
 
 
@@ -329,6 +330,29 @@ def parse_command(data: bytes):
             stream_key = str(args[0])
             entry_id = str(args[1])
 
+            # Parse and validate entry ID format: <milliseconds>-<sequence>
+            if '-' not in entry_id:
+                return CommandError("ERR Invalid stream ID specified as stream command argument")
+
+            try:
+                parts = entry_id.split('-')
+                if len(parts) != 2:
+                    return CommandError("ERR Invalid stream ID specified as stream command argument")
+
+                entry_id_ms = int(parts[0])
+                entry_id_seq = int(parts[1])
+
+                # Validate: 0-0 is not allowed
+                if entry_id_ms == 0 and entry_id_seq == 0:
+                    return CommandError("ERR The ID specified in XADD must be greater than 0-0")
+
+                # Ensure non-negative values
+                if entry_id_ms < 0 or entry_id_seq < 0:
+                    return CommandError("ERR Invalid stream ID specified as stream command argument")
+
+            except ValueError:
+                return CommandError("ERR Invalid stream ID specified as stream command argument")
+
             # Parse field-value pairs (remaining args must be pairs)
             field_args = args[2:]
             if len(field_args) % 2 != 0:
@@ -340,7 +364,12 @@ def parse_command(data: bytes):
                 field_value = str(field_args[i + 1])
                 fields[field_name] = field_value
 
-            return XaddCommand(stream_key=stream_key, entry_id=entry_id, fields=fields)
+            return XaddCommand(
+                stream_key=stream_key,
+                entry_id_ms=entry_id_ms,
+                entry_id_seq=entry_id_seq,
+                fields=fields
+            )
 
         else:
             return CommandError(f"unknown command '{cmd_name}'")
