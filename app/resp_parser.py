@@ -332,26 +332,26 @@ def parse_command(data: bytes):
 
             # Parse and validate entry ID format: <milliseconds>-<sequence>
             if '-' not in entry_id:
-                return CommandError("ERR Invalid stream ID specified as stream command argument")
+                return CommandError("Invalid stream ID specified as stream command argument")
 
             try:
                 parts = entry_id.split('-')
                 if len(parts) != 2:
-                    return CommandError("ERR Invalid stream ID specified as stream command argument")
+                    return CommandError("Invalid stream ID specified as stream command argument")
 
                 entry_id_ms = int(parts[0])
                 entry_id_seq = int(parts[1])
 
                 # Validate: 0-0 is not allowed
                 if entry_id_ms == 0 and entry_id_seq == 0:
-                    return CommandError("ERR The ID specified in XADD must be greater than 0-0")
+                    return CommandError("The ID specified in XADD must be greater than 0-0")
 
                 # Ensure non-negative values
                 if entry_id_ms < 0 or entry_id_seq < 0:
-                    return CommandError("ERR Invalid stream ID specified as stream command argument")
+                    return CommandError("Invalid stream ID specified as stream command argument")
 
             except ValueError:
-                return CommandError("ERR Invalid stream ID specified as stream command argument")
+                return CommandError("Invalid stream ID specified as stream command argument")
 
             # Parse field-value pairs (remaining args must be pairs)
             field_args = args[2:]
