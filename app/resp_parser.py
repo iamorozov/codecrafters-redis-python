@@ -89,6 +89,14 @@ class TypeCommand:
 
 
 @dataclass
+class XaddCommand:
+    """The XADD command appends a new entry to a stream."""
+    stream_key: str
+    entry_id: str
+    fields: dict[str, str]  # Key-value pairs for the entry
+
+
+@dataclass
 class CommandError:
     """Represents a command parsing/validation error"""
     message: str
@@ -313,6 +321,26 @@ def parse_command(data: bytes):
             if len(args) != 1:
                 return CommandError("wrong number of arguments for 'type' command")
             return TypeCommand(key=str(args[0]))
+
+        elif cmd_name == 'XADD':
+            if len(args) < 3:
+                return CommandError("wrong number of arguments for 'xadd' command")
+
+            stream_key = str(args[0])
+            entry_id = str(args[1])
+
+            # Parse field-value pairs (remaining args must be pairs)
+            field_args = args[2:]
+            if len(field_args) % 2 != 0:
+                return CommandError("wrong number of arguments for XADD")
+
+            fields = {}
+            for i in range(0, len(field_args), 2):
+                field_name = str(field_args[i])
+                field_value = str(field_args[i + 1])
+                fields[field_name] = field_value
+
+            return XaddCommand(stream_key=stream_key, entry_id=entry_id, fields=fields)
 
         else:
             return CommandError(f"unknown command '{cmd_name}'")

@@ -13,6 +13,7 @@ from app.resp_parser import (
     LpopCommand,
     BlpopCommand,
     TypeCommand,
+    XaddCommand,
     CommandError,
     encode_simple_string,
     encode_bulk_string,
@@ -176,7 +177,11 @@ def handle_type(command: TypeCommand) -> bytes:
 
     # Determine the type based on the value structure
     if isinstance(value, list):
-        type_name = "list"
+        # Check if it's a stream (list of tuples with (entry_id, fields))
+        if value and isinstance(value[0], tuple) and len(value[0]) == 2 and isinstance(value[0][1], dict):
+            type_name = "stream"
+        else:
+            type_name = "list"
     elif isinstance(value, tuple) and len(value) == 2:
         # This is our (value, expiry) format for strings
         type_name = "string"
@@ -186,6 +191,24 @@ def handle_type(command: TypeCommand) -> bytes:
 
     print(f"TYPE {command.key}: {type_name}")
     return encode_simple_string(type_name)
+
+
+def handle_xadd(command: XaddCommand) -> bytes:
+    """Handle XADD command - adds an entry to a stream"""
+    # Get or create the stream
+    stream = store.get(command.stream_key, [])
+
+    # Create entry as tuple: (entry_id, fields_dict)
+    entry = (command.entry_id, command.fields)
+
+    # Append entry to stream
+    stream.append(entry)
+    store[command.stream_key] = stream
+
+    print(f"Added to stream {command.stream_key}: ID={command.entry_id}, fields={command.fields}")
+
+    # Return the entry ID as a bulk string
+    return encode_bulk_string(command.entry_id)
 
 
 async def handle_blpop(command: BlpopCommand) -> bytes:
@@ -265,6 +288,8 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                 response = await handle_blpop(command)
             elif isinstance(command, TypeCommand):
                 response = handle_type(command)
+            elif isinstance(command, XaddCommand):
+                response = handle_xadd(command)
             else:
                 writer.write(encode_error("Unknown command"))
                 await writer.drain()
