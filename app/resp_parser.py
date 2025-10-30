@@ -83,6 +83,12 @@ class BlpopCommand:
 
 
 @dataclass
+class TypeCommand:
+    """The TYPE command returns the type of the value stored at key."""
+    key: str
+
+
+@dataclass
 class CommandError:
     """Represents a command parsing/validation error"""
     message: str
@@ -302,6 +308,11 @@ def parse_command(data: bytes):
             if len(args) < 1 or len(args) > 2:
                 return CommandError("wrong number of arguments for 'blpop' command")
             return BlpopCommand(list_key=str(args[0]), timeout=float(args[1]))
+
+        elif cmd_name == 'TYPE':
+            if len(args) != 1:
+                return CommandError("wrong number of arguments for 'type' command")
+            return TypeCommand(key=str(args[0]))
 
         else:
             return CommandError(f"unknown command '{cmd_name}'")

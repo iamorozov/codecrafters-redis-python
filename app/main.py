@@ -12,6 +12,7 @@ from app.resp_parser import (
     LlenCommand,
     LpopCommand,
     BlpopCommand,
+    TypeCommand,
     CommandError,
     encode_simple_string,
     encode_bulk_string,
@@ -164,6 +165,29 @@ def handle_lpop(command: LpopCommand) -> bytes:
         else encode_bulk_string(popped_elements[0])
 
 
+def handle_type(command: TypeCommand) -> bytes:
+    """Handle TYPE command - returns the type of value stored at key"""
+    if command.key not in store:
+        # Key doesn't exist
+        print(f"TYPE {command.key}: none")
+        return encode_simple_string("none")
+
+    value = store[command.key]
+
+    # Determine the type based on the value structure
+    if isinstance(value, list):
+        type_name = "list"
+    elif isinstance(value, tuple) and len(value) == 2:
+        # This is our (value, expiry) format for strings
+        type_name = "string"
+    else:
+        # Fallback for any other type
+        type_name = "string"
+
+    print(f"TYPE {command.key}: {type_name}")
+    return encode_simple_string(type_name)
+
+
 async def handle_blpop(command: BlpopCommand) -> bytes:
     """Handle BLPOP command - removes and returns the first element(s) of a list (Blocking)"""
 
@@ -239,6 +263,8 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                 response = handle_lpop(command)
             elif isinstance(command, BlpopCommand):
                 response = await handle_blpop(command)
+            elif isinstance(command, TypeCommand):
+                response = handle_type(command)
             else:
                 writer.write(encode_error("Unknown command"))
                 await writer.drain()
