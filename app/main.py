@@ -198,6 +198,21 @@ def handle_xadd(command: XaddCommand) -> bytes:
     # Get or create the stream
     stream = store.get(command.stream_key, [])
 
+    # Generate sequence number if missing
+    if not command.entry_id_seq and stream:
+        last_ms, last_seq, _ = stream[-1]
+
+        if command.entry_id_ms == last_ms:
+            command.entry_id_seq = last_seq + 1
+        else:
+            command.entry_id_seq = 0
+
+    if not command.entry_id_seq and not stream:
+        if command.entry_id_ms == 0:
+            command.entry_id_ms = 1
+        else:
+            command.entry_id_ms = 0
+
     # Validate against last entry ID if stream is not empty
     if stream:
         last_ms, last_seq, _ = stream[-1]

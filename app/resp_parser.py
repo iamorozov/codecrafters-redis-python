@@ -93,7 +93,7 @@ class XaddCommand:
     """The XADD command appends a new entry to a stream."""
     stream_key: str
     entry_id_ms: int  # Milliseconds part of entry ID
-    entry_id_seq: int  # Sequence number part of entry ID
+    entry_id_seq: Optional[int]  # Sequence number part of entry ID
     fields: dict[str, str]  # Key-value pairs for the entry
 
 
@@ -340,15 +340,11 @@ def parse_command(data: bytes):
                     return CommandError("Invalid stream ID specified as stream command argument")
 
                 entry_id_ms = int(parts[0])
-                entry_id_seq = int(parts[1])
+                entry_id_seq = int(parts[1]) if parts[1] != '*' else None
 
                 # Validate: 0-0 is not allowed
                 if entry_id_ms == 0 and entry_id_seq == 0:
                     return CommandError("The ID specified in XADD must be greater than 0-0")
-
-                # Ensure non-negative values
-                if entry_id_ms < 0 or entry_id_seq < 0:
-                    return CommandError("Invalid stream ID specified as stream command argument")
 
             except ValueError:
                 return CommandError("Invalid stream ID specified as stream command argument")
