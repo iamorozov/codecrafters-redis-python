@@ -8,7 +8,7 @@ RESP types:
 - Bulk Strings: $6\r\nfoobar\r\n (length followed by data)
 - Arrays: *2\r\n$4\r\nPING\r\n (count followed by elements)
 """
-
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -329,6 +329,10 @@ def parse_command(data: bytes):
 
             stream_key = str(args[0])
             entry_id = str(args[1])
+
+            if entry_id == '*':
+                current_millis = int(round(time.time() * 1000))
+                entry_id = str(current_millis) + '-*'
 
             # Parse and validate entry ID format: <milliseconds>-<sequence>
             if '-' not in entry_id:
