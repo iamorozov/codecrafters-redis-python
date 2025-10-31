@@ -209,9 +209,9 @@ def handle_xadd(command: XaddCommand) -> bytes:
 
     if not command.entry_id_seq and not stream:
         if command.entry_id_ms == 0:
-            command.entry_id_ms = 1
+            command.entry_id_seq = 1
         else:
-            command.entry_id_ms = 0
+            command.entry_id_seq = 0
 
     # Validate against last entry ID if stream is not empty
     if stream:
