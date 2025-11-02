@@ -98,6 +98,16 @@ class XaddCommand:
 
 
 @dataclass
+class XrangeCommand:
+    """The XRANGE command returns a range of entries from a stream."""
+    stream_key: str
+    start_id_ms: int  # Milliseconds part of start ID
+    start_id_seq: Optional[int]  # Sequence number part of start ID
+    end_id_ms: int  # Milliseconds part of end ID
+    end_id_seq: Optional[int]  # Sequence number part of end ID
+
+
+@dataclass
 class CommandError:
     """Represents a command parsing/validation error"""
     message: str
@@ -371,6 +381,50 @@ def parse_command(data: bytes):
                 fields=fields
             )
 
+        elif cmd_name == 'XRANGE':
+            if len(args) != 3:
+                return CommandError("wrong number of arguments for 'xrange' command")
+
+            stream_key = str(args[0])
+            start_id = str(args[1])
+            end_id = str(args[2])
+
+            # Parse start ID (can be "ms" or "ms-seq")
+            try:
+                if '-' in start_id:
+                    parts = start_id.split('-')
+                    if len(parts) != 2:
+                        return CommandError("Invalid stream ID specified as stream command argument")
+                    start_id_ms = int(parts[0])
+                    start_id_seq = int(parts[1]) if parts[1] != '*' else None
+                else:
+                    start_id_ms = int(start_id)
+                    start_id_seq = None
+            except ValueError:
+                return CommandError("Invalid stream ID specified as stream command argument")
+
+            # Parse end ID (can be "ms" or "ms-seq")
+            try:
+                if '-' in end_id:
+                    parts = end_id.split('-')
+                    if len(parts) != 2:
+                        return CommandError("Invalid stream ID specified as stream command argument")
+                    end_id_ms = int(parts[0])
+                    end_id_seq = int(parts[1]) if parts[1] != '*' else None
+                else:
+                    end_id_ms = int(end_id)
+                    end_id_seq = None
+            except ValueError:
+                return CommandError("Invalid stream ID specified as stream command argument")
+
+            return XrangeCommand(
+                stream_key=stream_key,
+                start_id_ms=start_id_ms,
+                start_id_seq=start_id_seq,
+                end_id_ms=end_id_ms,
+                end_id_seq=end_id_seq
+            )
+
         else:
             return CommandError(f"unknown command '{cmd_name}'")
 
@@ -467,5 +521,18 @@ def encode_array(items: Optional[list]) -> bytes:
 
     result = f"*{len(items)}\r\n".encode('utf-8')
     for item in items:
-        result += item
+        if isinstance(item, str):
+            result += encode_bulk_string(item)
+        elif isinstance(item, int):
+            result += encode_integer(item)
+        elif isinstance(item, list) or isinstance(item, tuple):
+            result += encode_array(item)
+        elif isinstance(item, dict):
+            array = []
+            for k, v in item.items():
+                array.append(str(k))
+                array.append(str(v))
+            result += encode_array(array)
+        else:
+            raise NotImplementedError(f"Unknown item type: {type(item)} for {item}")
     return result

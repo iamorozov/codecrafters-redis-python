@@ -14,6 +14,7 @@ from app.resp_parser import (
     BlpopCommand,
     TypeCommand,
     XaddCommand,
+    XrangeCommand,
     CommandError,
     encode_simple_string,
     encode_bulk_string,
@@ -239,6 +240,27 @@ def handle_xadd(command: XaddCommand) -> bytes:
     return encode_bulk_string(entry_id_str)
 
 
+def handle_xrange(command: XrangeCommand) -> bytes:
+    """Handle XRANGE command - returns a range of entries from a stream (stub)"""
+
+    start_ms = command.start_id_ms
+    start_seq = command.start_id_seq if command.start_id_seq is not None else 0
+    end_ms = command.end_id_ms
+    end_seq = command.end_id_seq
+
+    # Get or create the stream
+    stream = store.get(command.stream_key, [])
+
+    def include(ms, seq):
+        return (start_ms <= ms <= end_ms and (ms == start_ms and seq >= start_seq or ms != start_ms) and
+                (end_seq is None or ms == end_ms and seq <= end_seq or ms != end_ms))
+
+    result = [(f"{ms}-{seq}", data) for (ms, seq, data) in stream if include(ms, seq)]
+
+    print(f"XRANGE called on {command.stream_key}: start={command.start_id_ms}-{command.start_id_seq}, end={command.end_id_ms}-{command.end_id_seq}. Result={result}")
+    return encode_array(result)
+
+
 async def handle_blpop(command: BlpopCommand) -> bytes:
     """Handle BLPOP command - removes and returns the first element(s) of a list (Blocking)"""
 
@@ -318,6 +340,8 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                 response = handle_type(command)
             elif isinstance(command, XaddCommand):
                 response = handle_xadd(command)
+            elif isinstance(command, XrangeCommand):
+                response = handle_xrange(command)
             else:
                 writer.write(encode_error("Unknown command"))
                 await writer.drain()
