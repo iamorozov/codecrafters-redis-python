@@ -99,20 +99,18 @@ def encode_array(items: Optional[list]) -> bytes:
 
     result = f"*{len(items)}\r\n".encode('utf-8')
     for item in items:
-        if isinstance(item, bytes):
-            result += item
-        elif isinstance(item, str):
-            result += encode_bulk_string(item)
-        elif isinstance(item, int):
-            result += encode_integer(item)
-        elif isinstance(item, list) or isinstance(item, tuple):
-            result += encode_array(item)
-        elif isinstance(item, dict):
-            array = []
-            for k, v in item.items():
-                array.append(str(k))
-                array.append(str(v))
-            result += encode_array(array)
-        else:
-            raise NotImplementedError(f"Unknown item type: {type(item)} for {item}")
+        match item:
+            case bytes():
+                result += item
+            case str():
+                result += encode_bulk_string(item)
+            case int():
+                result += encode_integer(item)
+            case list() | tuple():
+                result += encode_array(item)
+            case dict():
+                kv_array = [str(v) for pair in item.items() for v in pair]
+                result += encode_array(kv_array)
+            case _:
+                raise NotImplementedError(f"Unknown item type: {type(item)} for {item}")
     return result

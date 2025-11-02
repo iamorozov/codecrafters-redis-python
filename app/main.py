@@ -296,46 +296,44 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
             command = parse_command(data)
             print(f"Parsed command: {command}")
 
-            # Handle command errors
-            if isinstance(command, CommandError):
-                writer.write(encode_error(command.message))
-                await writer.drain()
-                print(f"Sent error: {command.message}")
-                continue
-
-            # Dispatch to appropriate handler
-            response = None
-            if isinstance(command, PingCommand):
-                response = handle_ping(command)
-            elif isinstance(command, EchoCommand):
-                response = handle_echo(command)
-            elif isinstance(command, SetCommand):
-                response = handle_set(command)
-            elif isinstance(command, GetCommand):
-                response = handle_get(command)
-            elif isinstance(command, RpushCommand):
-                response = handle_rpush(command)
-            elif isinstance(command, LpushCommand):
-                response = handle_lpush(command)
-            elif isinstance(command, LrangeCommand):
-                response = handle_lrange(command)
-            elif isinstance(command, LlenCommand):
-                response = handle_llen(command)
-            elif isinstance(command, LpopCommand):
-                response = handle_lpop(command)
-            elif isinstance(command, BlpopCommand):
-                response = await handle_blpop(command)
-            elif isinstance(command, TypeCommand):
-                response = handle_type(command)
-            elif isinstance(command, XaddCommand):
-                response = handle_xadd(command)
-            elif isinstance(command, XrangeCommand):
-                response = handle_xrange(command)
-            else:
-                writer.write(encode_error("Unknown command"))
-                await writer.drain()
-                print(f"Got unknown command: {command}")
-                continue
+            # Dispatch to appropriate handler using pattern matching
+            match command:
+                case CommandError():
+                    writer.write(encode_error(command.message))
+                    await writer.drain()
+                    print(f"Sent error: {command.message}")
+                    continue
+                case PingCommand():
+                    response = handle_ping(command)
+                case EchoCommand():
+                    response = handle_echo(command)
+                case SetCommand():
+                    response = handle_set(command)
+                case GetCommand():
+                    response = handle_get(command)
+                case RpushCommand():
+                    response = handle_rpush(command)
+                case LpushCommand():
+                    response = handle_lpush(command)
+                case LrangeCommand():
+                    response = handle_lrange(command)
+                case LlenCommand():
+                    response = handle_llen(command)
+                case LpopCommand():
+                    response = handle_lpop(command)
+                case BlpopCommand():
+                    response = await handle_blpop(command)
+                case TypeCommand():
+                    response = handle_type(command)
+                case XaddCommand():
+                    response = handle_xadd(command)
+                case XrangeCommand():
+                    response = handle_xrange(command)
+                case _:
+                    writer.write(encode_error("Unknown command"))
+                    await writer.drain()
+                    print(f"Got unknown command: {command}")
+                    continue
 
             # Send response to client
             if response:
