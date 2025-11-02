@@ -101,7 +101,7 @@ class XaddCommand:
 class XrangeCommand:
     """The XRANGE command returns a range of entries from a stream."""
     stream_key: str
-    start_id_ms: int  # Milliseconds part of start ID
+    start_id_ms: Optional[int]  # Milliseconds part of start ID
     start_id_seq: Optional[int]  # Sequence number part of start ID
     end_id_ms: int  # Milliseconds part of end ID
     end_id_seq: Optional[int]  # Sequence number part of end ID
@@ -389,9 +389,12 @@ def parse_command(data: bytes):
             start_id = str(args[1])
             end_id = str(args[2])
 
-            # Parse start ID (can be "ms" or "ms-seq")
+            # Parse start ID (can be "-", "ms" or "ms-seq")
             try:
-                if '-' in start_id:
+                if start_id == '-':
+                    start_id_ms = None
+                    start_id_seq = None
+                elif '-' in start_id:
                     parts = start_id.split('-')
                     if len(parts) != 2:
                         return CommandError("Invalid stream ID specified as stream command argument")
