@@ -1,6 +1,6 @@
 import asyncio
 import time
-from app.resp_parser import *
+from app.commands import *
 from app.resp_encoder import *
 
 store = {}
