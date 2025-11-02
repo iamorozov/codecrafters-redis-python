@@ -521,7 +521,9 @@ def encode_array(items: Optional[list]) -> bytes:
 
     result = f"*{len(items)}\r\n".encode('utf-8')
     for item in items:
-        if isinstance(item, str):
+        if isinstance(item, bytes):
+            result += item
+        elif isinstance(item, str):
             result += encode_bulk_string(item)
         elif isinstance(item, int):
             result += encode_integer(item)
