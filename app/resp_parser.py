@@ -103,7 +103,7 @@ class XrangeCommand:
     stream_key: str
     start_id_ms: Optional[int]  # Milliseconds part of start ID
     start_id_seq: Optional[int]  # Sequence number part of start ID
-    end_id_ms: int  # Milliseconds part of end ID
+    end_id_ms: Optional[int]  # Milliseconds part of end ID
     end_id_seq: Optional[int]  # Sequence number part of end ID
 
 
@@ -406,9 +406,12 @@ def parse_command(data: bytes):
             except ValueError:
                 return CommandError("Invalid stream ID specified as stream command argument")
 
-            # Parse end ID (can be "ms" or "ms-seq")
+            # Parse end ID (can be "ms", "+" or "ms-seq")
             try:
-                if '-' in end_id:
+                if end_id == '+':
+                    end_id_ms = None
+                    end_id_seq = None
+                elif '-' in end_id:
                     parts = end_id.split('-')
                     if len(parts) != 2:
                         return CommandError("Invalid stream ID specified as stream command argument")

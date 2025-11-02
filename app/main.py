@@ -258,6 +258,9 @@ def handle_xrange(command: XrangeCommand) -> bytes:
     if not start_ms:
         start_ms = stream[0][0]
 
+    if not end_ms:
+        end_ms = stream[-1][0]
+
     def include(ms, seq):
         return (start_ms <= ms <= end_ms and (ms == start_ms and seq >= start_seq or ms != start_ms) and
                 (end_seq is None or ms == end_ms and seq <= end_seq or ms != end_ms))
