@@ -5,7 +5,7 @@ Contains handler functions for all Redis commands.
 Each handler takes a command object and returns RESP-encoded bytes.
 """
 import asyncio
-import time
+
 from app.commands import *
 from app.resp_encoder import *
 from app.storage import store, queues
