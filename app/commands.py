@@ -106,6 +106,12 @@ class XrangeCommand:
 
 
 @dataclass
+class XreadCommand:
+    """The XREAD command reads entries from one or more streams after a specified ID (exclusive)."""
+    streams: list[tuple[str, Optional[int], Optional[int]]]  # List of (stream_key, last_id_ms, last_id_seq)
+
+
+@dataclass
 class CommandError:
     """Represents a command parsing/validation error"""
     message: str
@@ -304,7 +310,7 @@ def parse_xrange(args: list):
     except ValueError:
         return CommandError("Invalid stream ID specified as stream command argument")
 
-    # Parse end ID (can be "ms", "+" or "ms-seq")
+    # Parse end ID (can be "ms", "+" or "ms-seg")
     try:
         if end_id == '+':
             end_id_ms = None
@@ -330,6 +336,56 @@ def parse_xrange(args: list):
     )
 
 
+def parse_xread(args: list):
+    """Parse XREAD command - syntax: XREAD STREAMS key [key ...] id [id ...]"""
+    if len(args) < 3:
+        return CommandError("wrong number of arguments for 'xread' command")
+
+    # Find STREAMS keyword
+    streams_idx = None
+    for i, arg in enumerate(args):
+        if str(arg).upper() == 'STREAMS':
+            streams_idx = i
+            break
+
+    if streams_idx is None:
+        return CommandError("syntax error")
+
+    # Arguments after STREAMS should be: key1 key2 ... id1 id2 ...
+    stream_args = args[streams_idx + 1:]
+
+    if len(stream_args) == 0 or len(stream_args) % 2 != 0:
+        return CommandError("wrong number of arguments for 'xread' command")
+
+    num_streams = len(stream_args) // 2
+    stream_keys = stream_args[:num_streams]
+    stream_ids = stream_args[num_streams:]
+
+    # Parse each stream key and ID pair
+    streams = []
+    for key, id_str in zip(stream_keys, stream_ids):
+        stream_key = str(key)
+        id_str = str(id_str)
+
+        # Parse ID (can be "ms" or "ms-seq")
+        try:
+            if '-' in id_str:
+                parts = id_str.split('-')
+                if len(parts) != 2:
+                    return CommandError("Invalid stream ID specified as stream command argument")
+                last_id_ms = int(parts[0])
+                last_id_seq = int(parts[1]) if parts[1] != '*' else None
+            else:
+                last_id_ms = int(id_str)
+                last_id_seq = None
+        except ValueError:
+            return CommandError("Invalid stream ID specified as stream command argument")
+
+        streams.append((stream_key, last_id_ms, last_id_seq))
+
+    return XreadCommand(streams=streams)
+
+
 # Command parser registry
 COMMAND_PARSERS = {
     'PING': parse_ping,
@@ -345,6 +401,7 @@ COMMAND_PARSERS = {
     'TYPE': parse_type,
     'XADD': parse_xadd,
     'XRANGE': parse_xrange,
+    'XREAD': parse_xread,
 }
 
 

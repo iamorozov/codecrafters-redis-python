@@ -236,6 +236,45 @@ def handle_xrange(command: XrangeCommand) -> bytes:
     return encode_array(result)
 
 
+def handle_xread(command: XreadCommand) -> bytes:
+    """Handle XREAD command - reads entries from streams after specified IDs (exclusive)"""
+    results = []
+
+    for stream_key, last_id_ms, last_id_seq in command.streams:
+        # Get the stream
+        stream = store.get(stream_key, [])
+
+        if not stream:
+            # If stream doesn't exist, skip it (XREAD returns only streams with data)
+            continue
+
+        # Default sequence to 0 if not specified
+        if last_id_seq is None:
+            last_id_seq = 0
+
+        # Filter entries with ID > last_id (exclusive)
+        def is_greater(ms, seq):
+            if ms > last_id_ms:
+                return True
+            if ms == last_id_ms and seq > last_id_seq:
+                return True
+            return False
+
+        stream_entries = [(f"{ms}-{seq}", data) for (ms, seq, data) in stream if is_greater(ms, seq)]
+
+        # Only include stream if it has entries
+        if stream_entries:
+            results.append([stream_key, stream_entries])
+
+    print(f"XREAD called. Results: {results}")
+
+    # If no streams have data, return null
+    if not results:
+        return encode_array(None)
+
+    return encode_array(results)
+
+
 async def handle_blpop(command: BlpopCommand) -> bytes:
     """Handle BLPOP command - removes and returns the first element(s) of a list (Blocking)"""
     stored_list = store.get(command.list_key, [])
