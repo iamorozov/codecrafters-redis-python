@@ -117,6 +117,55 @@ class CommandError:
     message: str
 
 
+# Helper functions for parsing
+
+def parse_stream_id(id_str: str, allow_special: bool = False) -> tuple[Optional[int], Optional[int]] | CommandError:
+    """
+    Parse a stream ID string into (milliseconds, sequence) tuple.
+
+    Args:
+        id_str: The ID string to parse (e.g., "1526985054069", "1526985054069-0", "-", "+", "*")
+        allow_special: Whether to allow special values like "-" (min) or "+" (max)
+
+    Returns:
+        Tuple of (ms, seq) where either can be None for special values,
+        or CommandError if parsing fails
+
+    Examples:
+        >>> parse_stream_id("1526985054069")
+        (1526985054069, None)
+
+        >>> parse_stream_id("1526985054069-0")
+        (1526985054069, 0)
+
+        >>> parse_stream_id("-", allow_special=True)
+        (None, None)
+
+        >>> parse_stream_id("+", allow_special=True)
+        (None, None)
+    """
+    # Handle special values
+    if allow_special:
+        if id_str == '-' or id_str == '+':
+            return (None, None)
+
+    # Parse format: "ms" or "ms-seq"
+    try:
+        if '-' in id_str:
+            parts = id_str.split('-')
+            if len(parts) != 2:
+                return CommandError("Invalid stream ID specified as stream command argument")
+
+            ms = int(parts[0])
+            seq = int(parts[1]) if parts[1] != '*' else None
+            return (ms, seq)
+        else:
+            ms = int(id_str)
+            return (ms, None)
+    except ValueError:
+        return CommandError("Invalid stream ID specified as stream command argument")
+
+
 # Individual command parsers
 
 def parse_ping(args: list):
@@ -250,20 +299,15 @@ def parse_xadd(args: list):
     if '-' not in entry_id:
         return CommandError("Invalid stream ID specified as stream command argument")
 
-    try:
-        parts = entry_id.split('-')
-        if len(parts) != 2:
-            return CommandError("Invalid stream ID specified as stream command argument")
+    result = parse_stream_id(entry_id, allow_special=False)
+    if isinstance(result, CommandError):
+        return result
 
-        entry_id_ms = int(parts[0])
-        entry_id_seq = int(parts[1]) if parts[1] != '*' else None
+    entry_id_ms, entry_id_seq = result
 
-        # Validate: 0-0 is not allowed
-        if entry_id_ms == 0 and entry_id_seq == 0:
-            return CommandError("The ID specified in XADD must be greater than 0-0")
-
-    except ValueError:
-        return CommandError("Invalid stream ID specified as stream command argument")
+    # Validate: 0-0 is not allowed
+    if entry_id_ms == 0 and entry_id_seq == 0:
+        return CommandError("The ID specified in XADD must be greater than 0-0")
 
     # Parse field-value pairs (remaining args must be pairs)
     field_args = args[2:]
@@ -294,38 +338,16 @@ def parse_xrange(args: list):
     end_id = str(args[2])
 
     # Parse start ID (can be "-", "ms" or "ms-seq")
-    try:
-        if start_id == '-':
-            start_id_ms = None
-            start_id_seq = None
-        elif '-' in start_id:
-            parts = start_id.split('-')
-            if len(parts) != 2:
-                return CommandError("Invalid stream ID specified as stream command argument")
-            start_id_ms = int(parts[0])
-            start_id_seq = int(parts[1]) if parts[1] != '*' else None
-        else:
-            start_id_ms = int(start_id)
-            start_id_seq = None
-    except ValueError:
-        return CommandError("Invalid stream ID specified as stream command argument")
+    start_result = parse_stream_id(start_id, allow_special=True)
+    if isinstance(start_result, CommandError):
+        return start_result
+    start_id_ms, start_id_seq = start_result
 
-    # Parse end ID (can be "ms", "+" or "ms-seg")
-    try:
-        if end_id == '+':
-            end_id_ms = None
-            end_id_seq = None
-        elif '-' in end_id:
-            parts = end_id.split('-')
-            if len(parts) != 2:
-                return CommandError("Invalid stream ID specified as stream command argument")
-            end_id_ms = int(parts[0])
-            end_id_seq = int(parts[1]) if parts[1] != '*' else None
-        else:
-            end_id_ms = int(end_id)
-            end_id_seq = None
-    except ValueError:
-        return CommandError("Invalid stream ID specified as stream command argument")
+    # Parse end ID (can be "ms", "+" or "ms-seq")
+    end_result = parse_stream_id(end_id, allow_special=True)
+    if isinstance(end_result, CommandError):
+        return end_result
+    end_id_ms, end_id_seq = end_result
 
     return XrangeCommand(
         stream_key=stream_key,
@@ -368,19 +390,11 @@ def parse_xread(args: list):
         id_str = str(id_str)
 
         # Parse ID (can be "ms" or "ms-seq")
-        try:
-            if '-' in id_str:
-                parts = id_str.split('-')
-                if len(parts) != 2:
-                    return CommandError("Invalid stream ID specified as stream command argument")
-                last_id_ms = int(parts[0])
-                last_id_seq = int(parts[1]) if parts[1] != '*' else None
-            else:
-                last_id_ms = int(id_str)
-                last_id_seq = None
-        except ValueError:
-            return CommandError("Invalid stream ID specified as stream command argument")
+        result = parse_stream_id(id_str, allow_special=False)
+        if isinstance(result, CommandError):
+            return result
 
+        last_id_ms, last_id_seq = result
         streams.append((stream_key, last_id_ms, last_id_seq))
 
     return XreadCommand(streams=streams)
