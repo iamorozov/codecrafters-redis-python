@@ -398,16 +398,13 @@ def parse_xread(args: list):
     # Parse each stream key and ID pair
     streams = []
     for key, id_str in zip(stream_keys, stream_ids):
-        stream_key = str(key)
-        id_str = str(id_str)
-
         # Parse ID (can be "ms" or "ms-seq")
-        result = parse_stream_id(id_str, allow_special=False)
+        result = parse_stream_id(id_str, allow_special=True)
         if isinstance(result, CommandError):
             return result
 
         last_id_ms, last_id_seq = result
-        streams.append((stream_key, last_id_ms, last_id_seq))
+        streams.append((key, last_id_ms, last_id_seq))
 
     return XreadCommand(streams=streams, block_ms=block_ms)
 
