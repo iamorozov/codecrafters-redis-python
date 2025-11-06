@@ -147,7 +147,7 @@ def parse_stream_id(id_str: str, allow_special: bool = False) -> tuple[Optional[
     """
     # Handle special values
     if allow_special:
-        if id_str == '-' or id_str == '+':
+        if id_str == '-' or id_str == '+' or id_str == '$':
             return (None, None)
 
     # Parse format: "ms" or "ms-seq"

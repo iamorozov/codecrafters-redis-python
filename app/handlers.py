@@ -250,12 +250,17 @@ async def handle_xread(command: XreadCommand) -> bytes:
     def get_new_entries():
         """Helper to get new entries from all streams"""
         results = []
-        for stream_key, last_id_ms, last_id_seq in command.streams:
+        for i, (stream_key, last_id_ms, last_id_seq) in enumerate(command.streams):
             # Get the stream
             stream = store.get(stream_key, [])
 
             if not stream:
                 # If stream doesn't exist, skip it
+                continue
+
+            # If last id not specified, set it to the greatest value for async wait
+            if last_id_ms is None:
+                command.streams[i] = (stream_key, stream[-1][0], stream[-1][1])
                 continue
 
             # Default sequence to 0 if not specified
