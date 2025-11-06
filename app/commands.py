@@ -109,6 +109,7 @@ class XrangeCommand:
 class XreadCommand:
     """The XREAD command reads entries from one or more streams after a specified ID (exclusive)."""
     streams: list[tuple[str, Optional[int], Optional[int]]]  # List of (stream_key, last_id_ms, last_id_seq)
+    block_ms: Optional[int] = None  # Blocking timeout in milliseconds (None = non-blocking)
 
 
 @dataclass
@@ -359,13 +360,24 @@ def parse_xrange(args: list):
 
 
 def parse_xread(args: list):
-    """Parse XREAD command - syntax: XREAD STREAMS key [key ...] id [id ...]"""
+    """Parse XREAD command - syntax: XREAD [BLOCK milliseconds] STREAMS key [key ...] id [id ...]"""
     if len(args) < 3:
         return CommandError("wrong number of arguments for 'xread' command")
 
+    # Check for optional BLOCK keyword
+    block_ms = None
+    args_offset = 0
+
+    if len(args) >= 2 and str(args[0]).upper() == 'BLOCK':
+        try:
+            block_ms = int(args[1])
+            args_offset = 2
+        except ValueError:
+            return CommandError("invalid BLOCK timeout")
+
     # Find STREAMS keyword
     streams_idx = None
-    for i, arg in enumerate(args):
+    for i, arg in enumerate(args[args_offset:], start=args_offset):
         if str(arg).upper() == 'STREAMS':
             streams_idx = i
             break
@@ -397,7 +409,7 @@ def parse_xread(args: list):
         last_id_ms, last_id_seq = result
         streams.append((stream_key, last_id_ms, last_id_seq))
 
-    return XreadCommand(streams=streams)
+    return XreadCommand(streams=streams, block_ms=block_ms)
 
 
 # Command parser registry

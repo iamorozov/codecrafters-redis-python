@@ -13,3 +13,7 @@ store = {}
 # Queues for blocking operations (BLPOP)
 # Maps list keys to asyncio.Queue instances
 queues = {}
+
+# Queues for blocking stream operations (XREAD BLOCK)
+# Maps stream keys to list of asyncio.Queue instances (multiple readers can wait)
+stream_queues = {}

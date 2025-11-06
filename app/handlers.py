@@ -8,7 +8,7 @@ import asyncio
 
 from app.commands import *
 from app.resp_encoder import *
-from app.storage import store, queues
+from app.storage import store, queues, stream_queues
 
 
 def handle_ping(command: PingCommand) -> bytes:
@@ -202,6 +202,14 @@ def handle_xadd(command: XaddCommand) -> bytes:
     entry_id_str = f"{command.entry_id_ms}-{command.entry_id_seq}"
     print(f"Added to stream {command.stream_key}: ID={entry_id_str}, fields={command.fields}")
 
+    # Notify waiting XREAD BLOCK commands
+    if command.stream_key in stream_queues:
+        for queue in stream_queues[command.stream_key]:
+            try:
+                queue.put_nowait(entry)
+            except asyncio.QueueFull:
+                pass  # Queue is full, skip
+
     # Return the entry ID as a bulk string
     return encode_bulk_string(entry_id_str)
 
@@ -236,35 +244,92 @@ def handle_xrange(command: XrangeCommand) -> bytes:
     return encode_array(result)
 
 
-def handle_xread(command: XreadCommand) -> bytes:
+async def handle_xread(command: XreadCommand) -> bytes:
     """Handle XREAD command - reads entries from streams after specified IDs (exclusive)"""
-    results = []
 
-    for stream_key, last_id_ms, last_id_seq in command.streams:
-        # Get the stream
-        stream = store.get(stream_key, [])
+    def get_new_entries():
+        """Helper to get new entries from all streams"""
+        results = []
+        for stream_key, last_id_ms, last_id_seq in command.streams:
+            # Get the stream
+            stream = store.get(stream_key, [])
 
-        if not stream:
-            # If stream doesn't exist, skip it (XREAD returns only streams with data)
-            continue
+            if not stream:
+                # If stream doesn't exist, skip it
+                continue
 
-        # Default sequence to 0 if not specified
-        if last_id_seq is None:
-            last_id_seq = 0
+            # Default sequence to 0 if not specified
+            seq_to_check = last_id_seq if last_id_seq is not None else 0
 
-        # Filter entries with ID > last_id (exclusive)
-        def is_greater(ms, seq):
-            if ms > last_id_ms:
+            # Filter entries with ID > last_id (exclusive)
+            def is_greater(ms, seq):
+                if ms > last_id_ms:
+                    return True
+                if ms == last_id_ms and seq > seq_to_check:
+                    return True
+                return False
+
+            stream_entries = [(f"{ms}-{seq}", data) for (ms, seq, data) in stream if is_greater(ms, seq)]
+
+            # Only include stream if it has entries
+            if stream_entries:
+                results.append([stream_key, stream_entries])
+
+        return results
+
+    # Try to get data immediately
+    results = get_new_entries()
+
+    # If no data and blocking is requested, wait for new data
+    if not results and command.block_ms is not None:
+        # Create queues for each stream we're watching
+        my_queues = []
+        for stream_key, _, _ in command.streams:
+            queue = asyncio.Queue(maxsize=1)
+            my_queues.append((stream_key, queue))
+
+            # Register queue for this stream
+            if stream_key not in stream_queues:
+                stream_queues[stream_key] = []
+            stream_queues[stream_key].append(queue)
+
+        try:
+            # Wait for data with timeout
+            timeout_seconds = command.block_ms / 1000.0 if command.block_ms > 0 else None
+
+            # Wait for any queue to receive data
+            async def wait_for_any_queue():
+                tasks = [asyncio.create_task(queue.get()) for _, queue in my_queues]
+                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
+                # Cancel pending tasks
+                for task in pending:
+                    task.cancel()
+
                 return True
-            if ms == last_id_ms and seq > last_id_seq:
-                return True
-            return False
 
-        stream_entries = [(f"{ms}-{seq}", data) for (ms, seq, data) in stream if is_greater(ms, seq)]
+            try:
+                if timeout_seconds is not None and timeout_seconds > 0:
+                    await asyncio.wait_for(wait_for_any_queue(), timeout=timeout_seconds)
+                elif timeout_seconds is None:
+                    await wait_for_any_queue()
+                # If timeout is 0, we already checked once above
+            except asyncio.TimeoutError:
+                pass  # Timeout expired, return empty
 
-        # Only include stream if it has entries
-        if stream_entries:
-            results.append([stream_key, stream_entries])
+            # After waking up, get new entries
+            results = get_new_entries()
+
+        finally:
+            # Clean up queues
+            for stream_key, queue in my_queues:
+                if stream_key in stream_queues:
+                    try:
+                        stream_queues[stream_key].remove(queue)
+                        if not stream_queues[stream_key]:
+                            del stream_queues[stream_key]
+                    except (ValueError, KeyError):
+                        pass
 
     print(f"XREAD called. Results: {results}")
 

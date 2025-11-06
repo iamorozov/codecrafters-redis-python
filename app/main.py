@@ -85,7 +85,7 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                 case XrangeCommand():
                     response = handle_xrange(command)
                 case XreadCommand():
-                    response = handle_xread(command)
+                    response = await handle_xread(command)
                 case _:
                     writer.write(encode_error("Unknown command"))
                     await writer.drain()
