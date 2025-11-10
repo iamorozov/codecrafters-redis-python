@@ -113,6 +113,12 @@ class XreadCommand:
 
 
 @dataclass
+class IncrCommand:
+    """INCR command - increments the integer value of a key by one"""
+    key: str
+
+
+@dataclass
 class CommandError:
     """Represents a command parsing/validation error"""
     message: str
@@ -409,6 +415,13 @@ def parse_xread(args: list):
     return XreadCommand(streams=streams, block_ms=block_ms)
 
 
+def parse_incr(args: list):
+    """Parse INCR command"""
+    if len(args) != 1:
+        return CommandError("wrong number of arguments for 'incr' command")
+    return IncrCommand(key=str(args[0]))
+
+
 # Command parser registry
 COMMAND_PARSERS = {
     'PING': parse_ping,
@@ -425,6 +438,7 @@ COMMAND_PARSERS = {
     'XADD': parse_xadd,
     'XRANGE': parse_xrange,
     'XREAD': parse_xread,
+    'INCR': parse_incr,
 }
 
 

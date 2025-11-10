@@ -362,3 +362,15 @@ async def handle_blpop(command: BlpopCommand) -> bytes:
             return encode_array(None)
     else:
         return encode_array([encode_bulk_string(command.list_key), handle_lpop(LpopCommand(list_key=command.list_key))])
+
+
+def handle_incr(command: IncrCommand) -> bytes:
+    """Handle INCR command - increments the integer value of a key by one (stub)"""
+    value = store.get(command.key, 0)
+    if isinstance(value, int):
+        value += 1
+        store[command.key] = value
+        print(f"INCR called on key: {command.key}")
+        return encode_integer(value)
+    else:
+        return encode_error('value is not an integer or out of range')
