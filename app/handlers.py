@@ -50,7 +50,7 @@ def handle_get(command: GetCommand) -> bytes:
         del store[command.key]
         response = encode_null()
     else:
-        response = encode_bulk_string(value)
+        response = encode_bulk_string(str(value))
 
     print(f"Sent: {value}")
     return response
@@ -368,10 +368,11 @@ async def handle_blpop(command: BlpopCommand) -> bytes:
 
 def handle_incr(command: IncrCommand) -> bytes:
     """Handle INCR command - increments the integer value of a key by one (stub)"""
-    value = store.get(command.key, 0)
+    value, expiry = store.get(command.key, (0, None))
+
     if isinstance(value, int):
         value += 1
-        store[command.key] = value
+        store[command.key] = (value, expiry)
         print(f"INCR called on key: {command.key}")
         return encode_integer(value)
     else:
