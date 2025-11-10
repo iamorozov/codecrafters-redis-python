@@ -31,7 +31,9 @@ def handle_set(command: SetCommand) -> bytes:
     if command.expiry_ms is not None:
         expiry = now + command.expiry_ms
 
-    store[command.key] = (command.value, expiry)
+    value = int(command.value) if command.value.lstrip('-').isdigit() else command.value
+
+    store[command.key] = (value, expiry)
     print(f"Saved: {command.key}={command.value} (expiry: {expiry})")
     return encode_simple_string("OK")
 
