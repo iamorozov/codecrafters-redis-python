@@ -34,6 +34,7 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
         writer: Async stream writer for sending data
     """
     address = writer.get_extra_info('peername')
+    transaction_queue = None
     print(f"Client connected from {address}")
 
     try:
@@ -90,6 +91,8 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                     response = handle_incr(command)
                 case MultiCommand():
                     response = handle_multi(command)
+                case ExecCommand():
+                    response = handle_exec(command, transaction_queue)
                 case _:
                     writer.write(encode_error("Unknown command"))
                     await writer.drain()

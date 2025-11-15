@@ -125,6 +125,12 @@ class MultiCommand:
 
 
 @dataclass
+class ExecCommand:
+    """EXEC command - executes all commands in the transaction block"""
+    pass
+
+
+@dataclass
 class CommandError:
     """Represents a command parsing/validation error"""
     message: str
@@ -435,6 +441,13 @@ def parse_multi(args: list):
     return MultiCommand()
 
 
+def parse_exec(args: list):
+    """Parse EXEC command"""
+    if len(args) > 0:
+        return CommandError("wrong number of arguments for 'exec' command")
+    return ExecCommand()
+
+
 # Command parser registry
 COMMAND_PARSERS = {
     'PING': parse_ping,
@@ -453,6 +466,7 @@ COMMAND_PARSERS = {
     'XREAD': parse_xread,
     'INCR': parse_incr,
     'MULTI': parse_multi,
+    'EXEC': parse_exec,
 }
 
 

@@ -383,3 +383,14 @@ def handle_multi(command: MultiCommand) -> bytes:
     """Handle MULTI command - marks the start of a transaction block (stub)"""
     print("MULTI called")
     return encode_simple_string("OK")
+
+
+def handle_exec(command: ExecCommand, transaction_queue: Optional[list]) -> bytes:
+    """Handle EXEC command - executes all commands in the transaction block (stub)"""
+    # TODO: Implement EXEC logic to execute queued commands
+    print("EXEC called")
+
+    if transaction_queue is None:
+        return encode_error("EXEC without MULTI")
+
+    return encode_array([])
