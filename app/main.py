@@ -59,6 +59,9 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
             elif isinstance(command, ExecCommand):
                 response = await handle_exec(command, transaction_queue)
                 transaction_queue = None
+            elif isinstance(command, DiscardCommand):
+                response = handle_discard(command, transaction_queue)
+                transaction_queue = None
             elif transaction_queue is not None:
                 transaction_queue.append(command)
                 response = encode_simple_string('QUEUED')

@@ -437,3 +437,13 @@ async def handle_exec(command: ExecCommand, transaction_queue: Optional[list]) -
     results = [await handle_command(cmd) for cmd in transaction_queue]
 
     return encode_array(results)
+
+
+def handle_discard(command: DiscardCommand, transaction_queue: Optional[list]) -> bytes:
+    """Handle DISCARD command - aborts the current transaction"""
+    print("DISCARD called")
+
+    if transaction_queue is None:
+        return encode_error("DISCARD without MULTI")
+
+    return encode_simple_string("OK")

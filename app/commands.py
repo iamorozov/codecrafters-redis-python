@@ -131,6 +131,12 @@ class ExecCommand:
 
 
 @dataclass
+class DiscardCommand:
+    """DISCARD command - aborts the current transaction"""
+    pass
+
+
+@dataclass
 class CommandError:
     """Represents a command parsing/validation error"""
     message: str
@@ -448,6 +454,13 @@ def parse_exec(args: list):
     return ExecCommand()
 
 
+def parse_discard(args: list):
+    """Parse DISCARD command"""
+    if len(args) > 0:
+        return CommandError("wrong number of arguments for 'discard' command")
+    return DiscardCommand()
+
+
 # Command parser registry
 COMMAND_PARSERS = {
     'PING': parse_ping,
@@ -467,6 +480,7 @@ COMMAND_PARSERS = {
     'INCR': parse_incr,
     'MULTI': parse_multi,
     'EXEC': parse_exec,
+    'DISCARD': parse_discard,
 }
 
 
