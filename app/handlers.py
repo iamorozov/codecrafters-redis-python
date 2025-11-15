@@ -11,6 +11,43 @@ from app.resp_encoder import *
 from app.storage import store, queues, stream_queues
 
 
+async def handle_command(command) -> bytes:
+    match command:
+        case CommandError():
+            return encode_error(command.message)
+        case PingCommand():
+            return handle_ping(command)
+        case EchoCommand():
+            return handle_echo(command)
+        case SetCommand():
+            return handle_set(command)
+        case GetCommand():
+            return handle_get(command)
+        case RpushCommand():
+            return handle_rpush(command)
+        case LpushCommand():
+            return handle_lpush(command)
+        case LrangeCommand():
+            return handle_lrange(command)
+        case LlenCommand():
+            return handle_llen(command)
+        case LpopCommand():
+            return handle_lpop(command)
+        case BlpopCommand():
+            return await handle_blpop(command)
+        case TypeCommand():
+            return handle_type(command)
+        case XaddCommand():
+            return handle_xadd(command)
+        case XrangeCommand():
+            return handle_xrange(command)
+        case XreadCommand():
+            return await handle_xread(command)
+        case IncrCommand():
+            return handle_incr(command)
+        case _:
+            return encode_error("Unknown command")
+
 def handle_ping(command: PingCommand) -> bytes:
     """Handle PING command - returns PONG"""
     print("Sent: +PONG")
@@ -385,7 +422,7 @@ def handle_multi(command: MultiCommand) -> bytes:
     return encode_simple_string("OK")
 
 
-def handle_exec(command: ExecCommand, transaction_queue: Optional[list]) -> bytes:
+async def handle_exec(command: ExecCommand, transaction_queue: Optional[list]) -> bytes:
     """Handle EXEC command - executes all commands in the transaction block (stub)"""
     # TODO: Implement EXEC logic to execute queued commands
     print("EXEC called")
@@ -397,4 +434,6 @@ def handle_exec(command: ExecCommand, transaction_queue: Optional[list]) -> byte
         # Empty transaction - no commands queued
         return encode_array([])
 
-    return encode_array([])
+    results = [await handle_command(cmd) for cmd in transaction_queue]
+
+    return encode_array(results)
