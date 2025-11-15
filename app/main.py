@@ -94,6 +94,7 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                     response = handle_multi(command)
                 case ExecCommand():
                     response = handle_exec(command, transaction_queue)
+                    transaction_queue = None
                 case _:
                     writer.write(encode_error("Unknown command"))
                     await writer.drain()
