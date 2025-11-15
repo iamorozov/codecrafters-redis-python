@@ -53,7 +53,13 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
             print(f"Parsed command: {command}")
 
             # handle transactions
-            if transaction_queue is not None:
+            if isinstance(command, MultiCommand):
+                transaction_queue = []
+                response = handle_multi(command)
+            elif isinstance(command, ExecCommand):
+                response = handle_exec(command, transaction_queue)
+                transaction_queue = None
+            elif transaction_queue is not None:
                 transaction_queue.append(command)
                 response = encode_simple_string('QUEUED')
             else:
@@ -94,12 +100,6 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                         response = await handle_xread(command)
                     case IncrCommand():
                         response = handle_incr(command)
-                    case MultiCommand():
-                        transaction_queue = []
-                        response = handle_multi(command)
-                    case ExecCommand():
-                        response = handle_exec(command, transaction_queue)
-                        transaction_queue = None
                     case _:
                         writer.write(encode_error("Unknown command"))
                         await writer.drain()
