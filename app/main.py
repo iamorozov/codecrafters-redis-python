@@ -52,54 +52,59 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
             command = parse_command(data)
             print(f"Parsed command: {command}")
 
-            # Dispatch to appropriate handler using pattern matching
-            match command:
-                case CommandError():
-                    writer.write(encode_error(command.message))
-                    await writer.drain()
-                    print(f"Sent error: {command.message}")
-                    continue
-                case PingCommand():
-                    response = handle_ping(command)
-                case EchoCommand():
-                    response = handle_echo(command)
-                case SetCommand():
-                    response = handle_set(command)
-                case GetCommand():
-                    response = handle_get(command)
-                case RpushCommand():
-                    response = handle_rpush(command)
-                case LpushCommand():
-                    response = handle_lpush(command)
-                case LrangeCommand():
-                    response = handle_lrange(command)
-                case LlenCommand():
-                    response = handle_llen(command)
-                case LpopCommand():
-                    response = handle_lpop(command)
-                case BlpopCommand():
-                    response = await handle_blpop(command)
-                case TypeCommand():
-                    response = handle_type(command)
-                case XaddCommand():
-                    response = handle_xadd(command)
-                case XrangeCommand():
-                    response = handle_xrange(command)
-                case XreadCommand():
-                    response = await handle_xread(command)
-                case IncrCommand():
-                    response = handle_incr(command)
-                case MultiCommand():
-                    transaction_queue = []
-                    response = handle_multi(command)
-                case ExecCommand():
-                    response = handle_exec(command, transaction_queue)
-                    transaction_queue = None
-                case _:
-                    writer.write(encode_error("Unknown command"))
-                    await writer.drain()
-                    print(f"Got unknown command: {command}")
-                    continue
+            # handle transactions
+            if transaction_queue is not None:
+                transaction_queue.append(command)
+                response = encode_simple_string('QUEUED')
+            else:
+                # Dispatch to appropriate handler using pattern matching
+                match command:
+                    case CommandError():
+                        writer.write(encode_error(command.message))
+                        await writer.drain()
+                        print(f"Sent error: {command.message}")
+                        continue
+                    case PingCommand():
+                        response = handle_ping(command)
+                    case EchoCommand():
+                        response = handle_echo(command)
+                    case SetCommand():
+                        response = handle_set(command)
+                    case GetCommand():
+                        response = handle_get(command)
+                    case RpushCommand():
+                        response = handle_rpush(command)
+                    case LpushCommand():
+                        response = handle_lpush(command)
+                    case LrangeCommand():
+                        response = handle_lrange(command)
+                    case LlenCommand():
+                        response = handle_llen(command)
+                    case LpopCommand():
+                        response = handle_lpop(command)
+                    case BlpopCommand():
+                        response = await handle_blpop(command)
+                    case TypeCommand():
+                        response = handle_type(command)
+                    case XaddCommand():
+                        response = handle_xadd(command)
+                    case XrangeCommand():
+                        response = handle_xrange(command)
+                    case XreadCommand():
+                        response = await handle_xread(command)
+                    case IncrCommand():
+                        response = handle_incr(command)
+                    case MultiCommand():
+                        transaction_queue = []
+                        response = handle_multi(command)
+                    case ExecCommand():
+                        response = handle_exec(command, transaction_queue)
+                        transaction_queue = None
+                    case _:
+                        writer.write(encode_error("Unknown command"))
+                        await writer.drain()
+                        print(f"Got unknown command: {command}")
+                        continue
 
             # Send response to client
             if response:
