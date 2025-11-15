@@ -90,7 +90,7 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                 case IncrCommand():
                     response = handle_incr(command)
                 case MultiCommand():
-                    response = handle_multi(command)
+                    response = handle_multi(command, transaction_queue)
                 case ExecCommand():
                     response = handle_exec(command, transaction_queue)
                 case _:
