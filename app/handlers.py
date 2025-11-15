@@ -377,3 +377,9 @@ def handle_incr(command: IncrCommand) -> bytes:
         return encode_integer(value)
     else:
         return encode_error('value is not an integer or out of range')
+
+
+def handle_multi(command: MultiCommand) -> bytes:
+    """Handle MULTI command - marks the start of a transaction block (stub)"""
+    print("MULTI called")
+    return encode_simple_string("OK")
