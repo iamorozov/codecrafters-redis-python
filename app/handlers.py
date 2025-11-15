@@ -393,4 +393,8 @@ def handle_exec(command: ExecCommand, transaction_queue: Optional[list]) -> byte
     if transaction_queue is None:
         return encode_error("EXEC without MULTI")
 
+    if not transaction_queue:
+        # Empty transaction - no commands queued
+        return encode_array([])
+
     return encode_array([])
