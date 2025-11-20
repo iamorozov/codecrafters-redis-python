@@ -137,6 +137,12 @@ class DiscardCommand:
 
 
 @dataclass
+class InfoCommand:
+    """INFO command - returns information about the server"""
+    section: Optional[str] = None
+
+
+@dataclass
 class CommandError:
     """Represents a command parsing/validation error"""
     message: str
@@ -461,6 +467,15 @@ def parse_discard(args: list):
     return DiscardCommand()
 
 
+def parse_info(args: list):
+    """Parse INFO command"""
+    if len(args) > 1:
+        return CommandError("wrong number of arguments for 'info' command")
+
+    section = str(args[0]).lower() if len(args) == 1 else None
+    return InfoCommand(section=section)
+
+
 # Command parser registry
 COMMAND_PARSERS = {
     'PING': parse_ping,
@@ -481,6 +496,7 @@ COMMAND_PARSERS = {
     'MULTI': parse_multi,
     'EXEC': parse_exec,
     'DISCARD': parse_discard,
+    'INFO': parse_info,
 }
 
 

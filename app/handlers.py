@@ -45,6 +45,8 @@ async def handle_command(command) -> bytes:
             return await handle_xread(command)
         case IncrCommand():
             return handle_incr(command)
+        case InfoCommand():
+            return handle_info(command)
         case _:
             return encode_error("Unknown command")
 
@@ -447,3 +449,14 @@ def handle_discard(command: DiscardCommand, transaction_queue: Optional[list]) -
         return encode_error("DISCARD without MULTI")
 
     return encode_simple_string("OK")
+
+
+def handle_info(command: InfoCommand) -> bytes:
+    """Handle INFO command - returns server information"""
+    print(f"INFO called with section: {command.section}")
+
+    if command.section == "replication":
+        info_str = "# Replication\nrole:master"
+        return encode_bulk_string(info_str)
+    else:
+        return encode_bulk_string("")
