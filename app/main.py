@@ -45,6 +45,13 @@ async def perform_handshake():
     response = await reader.read(1024)  # Wait for OK
     print(f"REPLCONF capa response: {response}")
 
+    # Send PSYNC
+    psync_command = encode_array(["PSYNC", "?", "-1"])
+    writer.write(psync_command)
+    await writer.drain()
+    response = await reader.read(1024)  # Wait for OK
+    print(f"PSYNC response: {response}")
+
     writer.close()
     await writer.wait_closed()
 
