@@ -6,6 +6,9 @@ Handles server initialization and client connections.
 import argparse
 from app.handlers import *
 
+import app.config as config
+from app.resp_encoder import encode_array, encode_bulk_string
+
 
 def parse_args():
     """Parse command line arguments"""
@@ -15,9 +18,33 @@ def parse_args():
     return parser.parse_args()
 
 
+async def perform_handshake():
+    """Perform handshake with master server when running as replica"""
+    print(f"Connecting to master at {config.master_host}:{config.master_port}")
+
+    reader, writer = await asyncio.open_connection(config.master_host, config.master_port)
+
+    # Send PING command as RESP array
+    ping_command = encode_array([encode_bulk_string("PING")])
+    writer.write(ping_command)
+    await writer.drain()
+    print(f"Sent PING to master: {ping_command}")
+
+    # Wait for response
+    response = await reader.read(1024)
+    print(f"Received from master: {response}")
+
+    writer.close()
+    await writer.wait_closed()
+
+
 async def main(port: int):
     """Main entry point - starts the asyncio event loop and server"""
     print("Logs from your program will appear here!")
+
+    # Perform handshake if running as replica
+    if config.server_role == "slave":
+        await perform_handshake()
 
     # Create asyncio server
     server = await asyncio.start_server(
@@ -95,7 +122,6 @@ if __name__ == "__main__":
     args = parse_args()
 
     # Set server role based on --replicaof argument
-    import app.config as config
     if args.replicaof:
         config.server_role = "slave"
         # Parse "host port" format
