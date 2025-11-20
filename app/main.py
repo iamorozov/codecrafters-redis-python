@@ -3,22 +3,30 @@ Redis Server Main Entry Point
 
 Handles server initialization and client connections.
 """
+import argparse
 from app.handlers import *
 
 
-async def main():
+def parse_args():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(description="Redis Server")
+    parser.add_argument("--port", type=int, default=6379, help="Port to listen on (default: 6379)")
+    return parser.parse_args()
+
+
+async def main(port: int):
     """Main entry point - starts the asyncio event loop and server"""
     print("Logs from your program will appear here!")
 
-    # Create asyncio server on port 6379
+    # Create asyncio server
     server = await asyncio.start_server(
         handle_connection,
         host="localhost",
-        port=6379,
+        port=port,
         reuse_port=True
     )
 
-    print("Redis server listening on port 6379")
+    print(f"Redis server listening on port {port}")
 
     # Serve forever
     async with server:
@@ -83,4 +91,5 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    args = parse_args()
+    asyncio.run(main(args.port))
