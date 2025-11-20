@@ -25,7 +25,7 @@ async def perform_handshake():
     reader, writer = await asyncio.open_connection(config.master_host, config.master_port)
 
     # Send PING command as RESP array
-    ping_command = encode_array([encode_bulk_string("PING")])
+    ping_command = encode_array(["PING"])
     writer.write(ping_command)
     await writer.drain()
     print(f"Sent PING to master: {ping_command}")
@@ -33,6 +33,16 @@ async def perform_handshake():
     # Wait for response
     response = await reader.read(1024)
     print(f"Received from master: {response}")
+
+    replconf_command1 = encode_array(["REPLCONF", "listening-port", config.listening_port])
+    writer.write(replconf_command1)
+    await writer.drain()
+    print(f"Sent REPLCONF to master: {replconf_command1}")
+
+    replconf_command2 = encode_array(["REPLCONF", "capa", "psync2"])
+    writer.write(replconf_command2)
+    await writer.drain()
+    print(f"Sent REPLCONF to master: {replconf_command2}")
 
     writer.close()
     await writer.wait_closed()
@@ -128,5 +138,6 @@ if __name__ == "__main__":
         parts = args.replicaof.split()
         config.master_host = parts[0]
         config.master_port = int(parts[1])
+        config.listening_port = args.port
 
     asyncio.run(main(args.port))
