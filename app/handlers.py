@@ -457,7 +457,7 @@ def handle_info(command: InfoCommand) -> bytes:
     print(f"INFO called with section: {command.section}")
 
     if command.section == "replication":
-        info_str = f"# Replication\nrole:{config.server_role}"
+        info_str = f"# Replication\nrole:{config.server_role}\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\nmaster_repl_offset:0"
         return encode_bulk_string(info_str)
     else:
         return encode_bulk_string("")
