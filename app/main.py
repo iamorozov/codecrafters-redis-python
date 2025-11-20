@@ -34,7 +34,7 @@ async def perform_handshake():
     response = await reader.read(1024)
     print(f"Received from master: {response}")
 
-    replconf_command1 = encode_array(["REPLCONF", "listening-port", config.listening_port])
+    replconf_command1 = encode_array(["REPLCONF", "listening-port", str(config.listening_port)])
     writer.write(replconf_command1)
     await writer.drain()
     print(f"Sent REPLCONF to master: {replconf_command1}")
