@@ -8,6 +8,7 @@ import asyncio
 
 from app.commands import *
 from app.resp_encoder import *
+import app.config as config
 from app.storage import store, queues, stream_queues
 
 
@@ -456,7 +457,7 @@ def handle_info(command: InfoCommand) -> bytes:
     print(f"INFO called with section: {command.section}")
 
     if command.section == "replication":
-        info_str = "# Replication\nrole:master"
+        info_str = f"# Replication\nrole:{config.server_role}"
         return encode_bulk_string(info_str)
     else:
         return encode_bulk_string("")

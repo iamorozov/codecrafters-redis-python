@@ -11,6 +11,7 @@ def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description="Redis Server")
     parser.add_argument("--port", type=int, default=6379, help="Port to listen on (default: 6379)")
+    parser.add_argument("--replicaof", type=str, default=None, help="Master host and port (e.g., 'localhost 6379')")
     return parser.parse_args()
 
 
@@ -92,4 +93,14 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
 
 if __name__ == "__main__":
     args = parse_args()
+
+    # Set server role based on --replicaof argument
+    import app.config as config
+    if args.replicaof:
+        config.server_role = "slave"
+        # Parse "host port" format
+        parts = args.replicaof.split()
+        config.master_host = parts[0]
+        config.master_port = int(parts[1])
+
     asyncio.run(main(args.port))
