@@ -24,25 +24,26 @@ async def perform_handshake():
 
     reader, writer = await asyncio.open_connection(config.master_host, config.master_port)
 
-    # Send PING command as RESP array
+    # Send PING
     ping_command = encode_array(["PING"])
     writer.write(ping_command)
     await writer.drain()
-    print(f"Sent PING to master: {ping_command}")
-
-    # Wait for response
     response = await reader.read(1024)
-    print(f"Received from master: {response}")
+    print(f"PING response: {response}")
 
+    # Send REPLCONF listening-port
     replconf_command1 = encode_array(["REPLCONF", "listening-port", str(config.listening_port)])
     writer.write(replconf_command1)
     await writer.drain()
-    print(f"Sent REPLCONF to master: {replconf_command1}")
+    response = await reader.read(1024)  # Wait for OK
+    print(f"REPLCONF listening-port response: {response}")
 
+    # Send REPLCONF capa
     replconf_command2 = encode_array(["REPLCONF", "capa", "psync2"])
     writer.write(replconf_command2)
     await writer.drain()
-    print(f"Sent REPLCONF to master: {replconf_command2}")
+    response = await reader.read(1024)  # Wait for OK
+    print(f"REPLCONF capa response: {response}")
 
     writer.close()
     await writer.wait_closed()
