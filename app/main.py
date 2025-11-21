@@ -7,7 +7,12 @@ import argparse
 from app.handlers import *
 
 import app.config as config
-from app.resp_encoder import encode_array, encode_bulk_string
+from app.resp_encoder import encode_array
+
+import base64
+
+
+EMPTY_RDB_BASE64 = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog=="
 
 
 def parse_args():
@@ -126,6 +131,13 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
             if response:
                 writer.write(response)
                 await writer.drain()  # Ensure data is sent
+
+            # send replication file to client
+            if isinstance(command, PsyncCommand):
+                empty_rdb = base64.b64decode(EMPTY_RDB_BASE64)
+                writer.write(b"$" + str(len(empty_rdb)).encode('utf-8') + b"\r\n" + empty_rdb)
+                await writer.drain()
+
 
     except Exception as e:
         print(f"Error handling client: {e}")
