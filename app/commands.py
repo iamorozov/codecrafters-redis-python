@@ -143,6 +143,12 @@ class InfoCommand:
 
 
 @dataclass
+class ReplconfCommand:
+    """REPLCONF command - replication configuration"""
+    args: list[str]
+
+
+@dataclass
 class CommandError:
     """Represents a command parsing/validation error"""
     message: str
@@ -476,6 +482,11 @@ def parse_info(args: list):
     return InfoCommand(section=section)
 
 
+def parse_replconf(args: list):
+    """Parse REPLCONF command"""
+    return ReplconfCommand(args=[str(arg) for arg in args])
+
+
 # Command parser registry
 COMMAND_PARSERS = {
     'PING': parse_ping,
@@ -497,6 +508,7 @@ COMMAND_PARSERS = {
     'EXEC': parse_exec,
     'DISCARD': parse_discard,
     'INFO': parse_info,
+    'REPLCONF': parse_replconf,
 }
 
 

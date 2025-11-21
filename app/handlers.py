@@ -48,6 +48,8 @@ async def handle_command(command) -> bytes:
             return handle_incr(command)
         case InfoCommand():
             return handle_info(command)
+        case ReplconfCommand():
+            return handle_replconf(command)
         case _:
             return encode_error("Unknown command")
 
@@ -461,3 +463,9 @@ def handle_info(command: InfoCommand) -> bytes:
         return encode_bulk_string(info_str)
     else:
         return encode_bulk_string("")
+
+
+def handle_replconf(command: ReplconfCommand) -> bytes:
+    """Handle REPLCONF command - replication configuration (stub)"""
+    print(f"REPLCONF called with args: {command.args}")
+    return encode_simple_string("OK")
