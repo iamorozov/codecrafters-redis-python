@@ -148,4 +148,7 @@ if __name__ == "__main__":
         config.master_port = int(parts[1])
         config.listening_port = args.port
 
+    if config.server_role == "master":
+        config.replication_id = '8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb'
+
     asyncio.run(main(args.port))

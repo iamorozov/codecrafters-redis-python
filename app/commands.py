@@ -149,6 +149,13 @@ class ReplconfCommand:
 
 
 @dataclass
+class PsyncCommand:
+    """PSYNC command - partial resynchronization"""
+    replication_id: str
+    offset: str
+
+
+@dataclass
 class CommandError:
     """Represents a command parsing/validation error"""
     message: str
@@ -487,6 +494,13 @@ def parse_replconf(args: list):
     return ReplconfCommand(args=[str(arg) for arg in args])
 
 
+def parse_psync(args: list):
+    """Parse PSYNC command"""
+    if len(args) != 2:
+        return CommandError("wrong number of arguments for 'psync' command")
+    return PsyncCommand(replication_id=str(args[0]), offset=str(args[1]))
+
+
 # Command parser registry
 COMMAND_PARSERS = {
     'PING': parse_ping,
@@ -509,6 +523,7 @@ COMMAND_PARSERS = {
     'DISCARD': parse_discard,
     'INFO': parse_info,
     'REPLCONF': parse_replconf,
+    'PSYNC': parse_psync,
 }
 
 

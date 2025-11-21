@@ -50,6 +50,8 @@ async def handle_command(command) -> bytes:
             return handle_info(command)
         case ReplconfCommand():
             return handle_replconf(command)
+        case PsyncCommand():
+            return handle_psync(command)
         case _:
             return encode_error("Unknown command")
 
@@ -459,7 +461,7 @@ def handle_info(command: InfoCommand) -> bytes:
     print(f"INFO called with section: {command.section}")
 
     if command.section == "replication":
-        info_str = f"# Replication\nrole:{config.server_role}\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\nmaster_repl_offset:0"
+        info_str = f"# Replication\nrole:{config.server_role}\nmaster_replid:{config.replication_id}\nmaster_repl_offset:0"
         return encode_bulk_string(info_str)
     else:
         return encode_bulk_string("")
@@ -469,3 +471,9 @@ def handle_replconf(command: ReplconfCommand) -> bytes:
     """Handle REPLCONF command - replication configuration (stub)"""
     print(f"REPLCONF called with args: {command.args}")
     return encode_simple_string("OK")
+
+
+def handle_psync(command: PsyncCommand) -> bytes:
+    """Handle PSYNC command - partial resynchronization (stub)"""
+    print(f"PSYNC called with replication_id: {command.replication_id}, offset: {command.offset}")
+    return encode_simple_string(f"FULLRESYNC {config.replication_id} 0")
