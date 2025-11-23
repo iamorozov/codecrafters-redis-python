@@ -30,6 +30,7 @@ class SetCommand:
     key: str
     value: str
     expiry_ms: Optional[int] = None  # Expiry in milliseconds from now
+    write: bool = True
 
 
 @dataclass

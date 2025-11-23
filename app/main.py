@@ -54,20 +54,43 @@ async def perform_handshake():
     psync_command = encode_array(["PSYNC", "?", "-1"])
     writer.write(psync_command)
     await writer.drain()
-    response = await reader.read(1024)  # Wait for OK
+
+    response = await read_simple_string(reader)
     print(f"PSYNC response: {response}")
 
-    writer.close()
-    await writer.wait_closed()
+    rdb_data = await read_rdb_file(reader)
+    print(f"Received RDB file: {len(rdb_data)} bytes")
+
+    # use handle connection to listen for write operations on master
+    await handle_connection(reader, writer, is_replica=True)
+
+
+async def read_simple_string(reader) -> str:
+    """Read a RESP simple string (+OK\r\n) or error (-ERR\r\n)"""
+    line = await reader.readline()  # Reads until \r\n
+    return line.decode().strip()
+
+
+async def read_rdb_file(reader) -> bytes:
+    """Read RDB file in bulk string format: $<length>\r\n<data>"""
+    # Read the length line: $<length>\r\n
+    length_line = await reader.readline()
+
+    if not length_line.startswith(b'$'):
+      raise ValueError(f"Expected bulk string, got: {length_line}")
+
+    # Parse the length
+    length = int(length_line[1:].strip())
+
+    # Read exactly 'length' bytes
+    rdb_data = await reader.readexactly(length)
+
+    return rdb_data
 
 
 async def main(port: int):
     """Main entry point - starts the asyncio event loop and server"""
     print("Logs from your program will appear here!")
-
-    # Perform handshake if running as replica
-    if config.server_role == "slave":
-        await perform_handshake()
 
     # Create asyncio server
     server = await asyncio.start_server(
@@ -79,18 +102,23 @@ async def main(port: int):
 
     print(f"Redis server listening on port {port}")
 
+    # Perform handshake if running as replica
+    if config.server_role == "slave":
+        await perform_handshake()
+
     # Serve forever
     async with server:
         await server.serve_forever()
 
 
-async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, is_replica = False):
     """
     Handle a client connection using asyncio streams
 
     Args:
         reader: Async stream reader for receiving data
         writer: Async stream writer for sending data
+        :param is_replica:
     """
     address = writer.get_extra_info('peername')
     transaction_queue = None
@@ -128,7 +156,7 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                 response = await handle_command(command)
 
             # Send response to client
-            if response:
+            if response and not is_replica:
                 writer.write(response)
                 await writer.drain()  # Ensure data is sent
 
@@ -137,7 +165,13 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                 empty_rdb = base64.b64decode(EMPTY_RDB_BASE64)
                 writer.write(b"$" + str(len(empty_rdb)).encode('utf-8') + b"\r\n" + empty_rdb)
                 await writer.drain()
+                # save replica writer to use for replication
+                config.replica_streams.append((reader, writer))
 
+            # if master and write operation use replica writers to propagate the operation
+            if config.server_role == "master" and isinstance(command, SetCommand):
+                for _, write in config.replica_streams:
+                    write.write(data)
 
     except Exception as e:
         print(f"Error handling client: {e}")

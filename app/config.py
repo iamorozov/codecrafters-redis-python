@@ -12,3 +12,5 @@ master_host = None
 master_port = None
 listening_port = None
 replication_id = None
+
+replica_streams = []
